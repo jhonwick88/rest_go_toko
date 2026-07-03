@@ -33,6 +33,8 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 		// though Gin handles it natively, this is clean development practice.
 		api.GET("/items/search", handlers.SearchItems(db))
 		api.GET("/items/:itemno", handlers.GetItemByNo(db))
+		api.PUT("/items/:itemno", handlers.UpdateItem(db))
+		api.POST("/items", handlers.CreateItem(db))
 	}
 
 	return r
