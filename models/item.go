@@ -7,4 +7,5 @@ type Item struct {
 	ItemName   string  `json:"itemname"`
 	CategoryID int     `json:"categoryid"`
 	Price      float64 `json:"price"`
+	ObQuantity float64 `json:"obquantity"`
 }

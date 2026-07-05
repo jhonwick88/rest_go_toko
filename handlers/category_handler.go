@@ -68,7 +68,7 @@ func GetCategoryItems(db *sql.DB) gin.HandlerFunc {
 
 		limit, offset := GetPaginationParams(c)
 
-		query := "SELECT FIRST ? SKIP ? ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1 FROM ITEM WHERE CATEGORYID = ? ORDER BY ITEMNAME ASC"
+		query := "SELECT FIRST ? SKIP ? ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM WHERE CATEGORYID = ? ORDER BY ITEMNAME ASC"
 		rows, err := db.Query(query, limit, offset, categoryID)
 		if err != nil {
 			log.Printf("[Error] Query GetCategoryItems failed: %v", err)
@@ -85,8 +85,9 @@ func GetCategoryItems(db *sql.DB) gin.HandlerFunc {
 				itemName   sql.NullString
 				catID      sql.NullInt64
 				price      sql.NullFloat64
+				obQty      sql.NullFloat64
 			)
-			if err := rows.Scan(&itemNo, &itemUPC, &itemName, &catID, &price); err != nil {
+			if err := rows.Scan(&itemNo, &itemUPC, &itemName, &catID, &price, &obQty); err != nil {
 				log.Printf("[Error] Scan item failed: %v", err)
 				SendError(c, http.StatusInternalServerError, "Gagal membaca data produk")
 				return
@@ -97,6 +98,7 @@ func GetCategoryItems(db *sql.DB) gin.HandlerFunc {
 				ItemName:   stringsTrim(itemName.String),
 				CategoryID: int(catID.Int64),
 				Price:      price.Float64,
+				ObQuantity: obQty.Float64,
 			})
 		}
 

@@ -17,7 +17,7 @@ func GetItems(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		limit, offset := GetPaginationParams(c)
 
-		query := "SELECT FIRST ? SKIP ? ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1 FROM ITEM ORDER BY ITEMNO ASC"
+		query := "SELECT FIRST ? SKIP ? ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM ORDER BY ITEMNO ASC"
 		rows, err := db.Query(query, limit, offset)
 		if err != nil {
 			log.Printf("[Error] Query GetItems failed: %v", err)
@@ -34,8 +34,9 @@ func GetItems(db *sql.DB) gin.HandlerFunc {
 				itemName   sql.NullString
 				catID      sql.NullInt64
 				price      sql.NullFloat64
+				obQty      sql.NullFloat64
 			)
-			if err := rows.Scan(&itemNo, &itemUPC, &itemName, &catID, &price); err != nil {
+			if err := rows.Scan(&itemNo, &itemUPC, &itemName, &catID, &price, &obQty); err != nil {
 				log.Printf("[Error] Scan item failed: %v", err)
 				SendError(c, http.StatusInternalServerError, "Gagal membaca data produk")
 				return
@@ -46,6 +47,7 @@ func GetItems(db *sql.DB) gin.HandlerFunc {
 				ItemName:   strings.TrimSpace(itemName.String),
 				CategoryID: int(catID.Int64),
 				Price:      price.Float64,
+				ObQuantity: obQty.Float64,
 			})
 		}
 
@@ -72,7 +74,7 @@ func GetItemByNo(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		query := "SELECT ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1 FROM ITEM WHERE ITEMNO = ?"
+		query := "SELECT ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM WHERE ITEMNO = ?"
 		row := db.QueryRow(query, itemNoParam)
 
 		var (
@@ -81,8 +83,9 @@ func GetItemByNo(db *sql.DB) gin.HandlerFunc {
 			itemName   sql.NullString
 			catID      sql.NullInt64
 			price      sql.NullFloat64
+			obQty      sql.NullFloat64
 		)
-		err := row.Scan(&itemNo, &itemUPC, &itemName, &catID, &price)
+		err := row.Scan(&itemNo, &itemUPC, &itemName, &catID, &price, &obQty)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				SendError(c, http.StatusNotFound, "Produk tidak ditemukan")
@@ -99,6 +102,7 @@ func GetItemByNo(db *sql.DB) gin.HandlerFunc {
 			ItemName:   strings.TrimSpace(itemName.String),
 			CategoryID: int(catID.Int64),
 			Price:      price.Float64,
+			ObQuantity: obQty.Float64,
 		}
 
 		SendSuccess(c, "Data ditemukan", item)
@@ -118,7 +122,7 @@ func SearchItems(db *sql.DB) gin.HandlerFunc {
 
 		// Perform case-insensitive LIKE query using LOWER on name, no, and upc.
 		// Firebird parameter placeholder is ?
-		query := "SELECT FIRST ? SKIP ? ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1 FROM ITEM WHERE LOWER(ITEMNAME) LIKE ? OR LOWER(ITEMNO) LIKE ? OR LOWER(ITEMUPC) LIKE ? ORDER BY ITEMNAME ASC"
+		query := "SELECT FIRST ? SKIP ? ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM WHERE LOWER(ITEMNAME) LIKE ? OR LOWER(ITEMNO) LIKE ? OR LOWER(ITEMUPC) LIKE ? ORDER BY ITEMNAME ASC"
 		searchPattern := "%" + strings.ToLower(queryParam) + "%"
 
 		rows, err := db.Query(query, limit, offset, searchPattern, searchPattern, searchPattern)
@@ -137,8 +141,9 @@ func SearchItems(db *sql.DB) gin.HandlerFunc {
 				itemName   sql.NullString
 				catID      sql.NullInt64
 				price      sql.NullFloat64
+				obQty      sql.NullFloat64
 			)
-			if err := rows.Scan(&itemNo, &itemUPC, &itemName, &catID, &price); err != nil {
+			if err := rows.Scan(&itemNo, &itemUPC, &itemName, &catID, &price, &obQty); err != nil {
 				log.Printf("[Error] Scan item failed: %v", err)
 				SendError(c, http.StatusInternalServerError, "Gagal membaca data produk")
 				return
@@ -149,6 +154,7 @@ func SearchItems(db *sql.DB) gin.HandlerFunc {
 				ItemName:   strings.TrimSpace(itemName.String),
 				CategoryID: int(catID.Int64),
 				Price:      price.Float64,
+				ObQuantity: obQty.Float64,
 			})
 		}
 
@@ -220,7 +226,7 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 		}
 
 		// Retrieve updated item details to send back
-		query := "SELECT ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1 FROM ITEM WHERE ITEMNO = ?"
+		query := "SELECT ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM WHERE ITEMNO = ?"
 		row := db.QueryRow(query, newItemNo)
 
 		var (
@@ -229,8 +235,9 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 			resItemName sql.NullString
 			resCatID    sql.NullInt64
 			resPrice    sql.NullFloat64
+			resObQty    sql.NullFloat64
 		)
-		err = row.Scan(&resItemNo, &resItemUPC, &resItemName, &resCatID, &resPrice)
+		err = row.Scan(&resItemNo, &resItemUPC, &resItemName, &resCatID, &resPrice, &resObQty)
 		if err != nil {
 			log.Printf("[Error] Query GetItemByNo after update failed: %v", err)
 			SendSuccess(c, "Produk berhasil diperbarui", models.Item{
@@ -246,6 +253,7 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 			ItemName:   strings.TrimSpace(resItemName.String),
 			CategoryID: int(resCatID.Int64),
 			Price:      resPrice.Float64,
+			ObQuantity: resObQty.Float64,
 		}
 
 		SendSuccess(c, "Produk berhasil diperbarui", updatedItem)
@@ -256,11 +264,13 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 func CreateItem(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		type CreateItemInput struct {
-			ItemNo     string  `json:"itemno"`
-			ItemName   string  `json:"itemname" binding:"required"`
-			ItemUPC    string  `json:"itemupc"`
-			CategoryID int     `json:"categoryid"`
-			Price      float64 `json:"price"`
+			ItemNo     string   `json:"itemno"`
+			ItemName   string   `json:"itemname" binding:"required"`
+			ItemUPC    string   `json:"itemupc"`
+			CategoryID int      `json:"categoryid"`
+			Price      float64  `json:"price"`
+			ItemType   *int     `json:"itemtype"`
+			ObQuantity *float64 `json:"obquantity"`
 		}
 
 		var input CreateItemInput
@@ -282,6 +292,16 @@ func CreateItem(db *sql.DB) gin.HandlerFunc {
 
 		itemUPC := strings.TrimSpace(input.ItemUPC)
 
+		itemType := 0
+		if input.ItemType != nil {
+			itemType = *input.ItemType
+		}
+
+		obQuantity := 10.0
+		if input.ObQuantity != nil {
+			obQuantity = *input.ObQuantity
+		}
+
 		// Check if ITEMNO already exists to avoid primary/unique key issues
 		var exists int
 		checkQuery := "SELECT FIRST 1 1 FROM ITEM WHERE ITEMNO = ?"
@@ -292,9 +312,9 @@ func CreateItem(db *sql.DB) gin.HandlerFunc {
 		}
 
 		// Insert product.
-		// We first try to get the next ID from the generator GEN_ITEM_ID
+		// We first try to get the next ID from the generator ITEM_GEN
 		var nextID int
-		err := db.QueryRow("SELECT GEN_ID(GEN_ITEM_ID, 1) FROM RDB$DATABASE").Scan(&nextID)
+		err := db.QueryRow("SELECT GEN_ID(ITEM_GEN, 1) FROM RDB$DATABASE").Scan(&nextID)
 		if err != nil {
 			log.Printf("[Error] GEN_ID query failed: %v. Attempting insert without ID...", err)
 		}
@@ -303,11 +323,11 @@ func CreateItem(db *sql.DB) gin.HandlerFunc {
 		var args []interface{}
 
 		if nextID > 0 {
-			query = "INSERT INTO ITEM (ID, ITEMNO, ITEMNAME, ITEMUPC, CATEGORYID, DEF_UNITPRICE1, SUPPLIERID, UNIT1) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)"
-			args = []interface{}{nextID, itemNo, itemName, itemUPC, input.CategoryID, input.Price}
+			query = "INSERT INTO ITEM (ID, ITEMNO, ITEMNAME, ITEMUPC, CATEGORYID, DEF_UNITPRICE1, ITEMTYPE, OBQUANTITY, SUPPLIERID, UNIT1) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)"
+			args = []interface{}{nextID, itemNo, itemName, itemUPC, input.CategoryID, input.Price, itemType, obQuantity}
 		} else {
-			query = "INSERT INTO ITEM (ITEMNO, ITEMNAME, ITEMUPC, CATEGORYID, DEF_UNITPRICE1, SUPPLIERID, UNIT1) VALUES (?, ?, ?, ?, ?, NULL, NULL)"
-			args = []interface{}{itemNo, itemName, itemUPC, input.CategoryID, input.Price}
+			query = "INSERT INTO ITEM (ITEMNO, ITEMNAME, ITEMUPC, CATEGORYID, DEF_UNITPRICE1, ITEMTYPE, OBQUANTITY, SUPPLIERID, UNIT1) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL)"
+			args = []interface{}{itemNo, itemName, itemUPC, input.CategoryID, input.Price, itemType, obQuantity}
 		}
 
 		_, err = db.Exec(query, args...)
@@ -324,9 +344,10 @@ func CreateItem(db *sql.DB) gin.HandlerFunc {
 			resItemName sql.NullString
 			resCatID    sql.NullInt64
 			resPrice    sql.NullFloat64
+			resObQty    sql.NullFloat64
 		)
-		db.QueryRow("SELECT ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1 FROM ITEM WHERE ITEMNO = ?", itemNo).
-			Scan(&resItemNo, &resItemUPC, &resItemName, &resCatID, &resPrice)
+		db.QueryRow("SELECT ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM WHERE ITEMNO = ?", itemNo).
+			Scan(&resItemNo, &resItemUPC, &resItemName, &resCatID, &resPrice, &resObQty)
 
 		createdItem := models.Item{
 			ItemNo:     strings.TrimSpace(resItemNo.String),
@@ -334,6 +355,7 @@ func CreateItem(db *sql.DB) gin.HandlerFunc {
 			ItemName:   strings.TrimSpace(resItemName.String),
 			CategoryID: int(resCatID.Int64),
 			Price:      resPrice.Float64,
+			ObQuantity: resObQty.Float64,
 		}
 
 		SendSuccess(c, "Produk berhasil ditambahkan", createdItem)
