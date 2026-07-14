@@ -29,12 +29,12 @@ func GetItems(db *sql.DB) gin.HandlerFunc {
 		var items []models.Item
 		for rows.Next() {
 			var (
-				itemNo     sql.NullString
-				itemUPC    sql.NullString
-				itemName   sql.NullString
-				catID      sql.NullInt64
-				price      sql.NullFloat64
-				obQty      sql.NullFloat64
+				itemNo   sql.NullString
+				itemUPC  sql.NullString
+				itemName sql.NullString
+				catID    sql.NullInt64
+				price    sql.NullFloat64
+				obQty    sql.NullFloat64
 			)
 			if err := rows.Scan(&itemNo, &itemUPC, &itemName, &catID, &price, &obQty); err != nil {
 				log.Printf("[Error] Scan item failed: %v", err)
@@ -78,12 +78,12 @@ func GetItemByNo(db *sql.DB) gin.HandlerFunc {
 		row := db.QueryRow(query, itemNoParam)
 
 		var (
-			itemNo     sql.NullString
-			itemUPC    sql.NullString
-			itemName   sql.NullString
-			catID      sql.NullInt64
-			price      sql.NullFloat64
-			obQty      sql.NullFloat64
+			itemNo   sql.NullString
+			itemUPC  sql.NullString
+			itemName sql.NullString
+			catID    sql.NullInt64
+			price    sql.NullFloat64
+			obQty    sql.NullFloat64
 		)
 		err := row.Scan(&itemNo, &itemUPC, &itemName, &catID, &price, &obQty)
 		if err != nil {
@@ -136,12 +136,12 @@ func SearchItems(db *sql.DB) gin.HandlerFunc {
 		var items []models.Item
 		for rows.Next() {
 			var (
-				itemNo     sql.NullString
-				itemUPC    sql.NullString
-				itemName   sql.NullString
-				catID      sql.NullInt64
-				price      sql.NullFloat64
-				obQty      sql.NullFloat64
+				itemNo   sql.NullString
+				itemUPC  sql.NullString
+				itemName sql.NullString
+				catID    sql.NullInt64
+				price    sql.NullFloat64
+				obQty    sql.NullFloat64
 			)
 			if err := rows.Scan(&itemNo, &itemUPC, &itemName, &catID, &price, &obQty); err != nil {
 				log.Printf("[Error] Scan item failed: %v", err)
@@ -185,6 +185,7 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 			NewItemNo string  `json:"new_itemno" binding:"required"`
 			ItemUPC   string  `json:"itemupc"`
 			Price     float64 `json:"price"`
+			ItemName  string  `json:"itemname"`
 		}
 
 		var input UpdateItemInput
@@ -196,9 +197,15 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 		// Clean inputs
 		newItemNo := strings.TrimSpace(input.NewItemNo)
 		newItemUPC := strings.TrimSpace(input.ItemUPC)
+		newItemName := strings.TrimSpace(input.ItemName)
 
 		if newItemNo == "" {
 			SendError(c, http.StatusBadRequest, "new_itemno tidak boleh kosong")
+			return
+		}
+
+		if newItemName == "" {
+			SendError(c, http.StatusBadRequest, "itemname tidak boleh kosong")
 			return
 		}
 
@@ -217,8 +224,15 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 		}
 
 		// Execute update
-		updateQuery := "UPDATE ITEM SET ITEMNO = ?, ITEMUPC = ?, DEF_UNITPRICE1 = ? WHERE ITEMNO = ?"
-		_, err = db.Exec(updateQuery, newItemNo, newItemUPC, input.Price, itemNoParam)
+		var upcToSave interface{}
+		if newItemUPC == "" {
+			upcToSave = sql.NullString{String: "", Valid: false}
+		} else {
+			upcToSave = newItemUPC
+		}
+
+		updateQuery := "UPDATE ITEM SET ITEMNO = ?, ITEMUPC = ?, DEF_UNITPRICE1 = ?, ITEMNAME = ? WHERE ITEMNO = ?"
+		_, err = db.Exec(updateQuery, newItemNo, upcToSave, input.Price, newItemName, itemNoParam)
 		if err != nil {
 			log.Printf("[Error] Query UpdateItem failed: %v", err)
 			SendError(c, http.StatusInternalServerError, "Gagal memperbarui database produk: "+err.Error())
@@ -241,8 +255,9 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 		if err != nil {
 			log.Printf("[Error] Query GetItemByNo after update failed: %v", err)
 			SendSuccess(c, "Produk berhasil diperbarui", models.Item{
-				ItemNo:  newItemNo,
-				ItemUPC: newItemUPC,
+				ItemNo:   newItemNo,
+				ItemUPC:  newItemUPC,
+				ItemName: newItemName,
 			})
 			return
 		}
@@ -291,6 +306,12 @@ func CreateItem(db *sql.DB) gin.HandlerFunc {
 		}
 
 		itemUPC := strings.TrimSpace(input.ItemUPC)
+		var upcToSave interface{}
+		if itemUPC == "" {
+			upcToSave = sql.NullString{String: "", Valid: false}
+		} else {
+			upcToSave = itemUPC
+		}
 
 		itemType := 0
 		if input.ItemType != nil {
@@ -324,10 +345,10 @@ func CreateItem(db *sql.DB) gin.HandlerFunc {
 
 		if nextID > 0 {
 			query = "INSERT INTO ITEM (ID, ITEMNO, ITEMNAME, ITEMUPC, CATEGORYID, DEF_UNITPRICE1, ITEMTYPE, OBQUANTITY, SUPPLIERID, UNIT1) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)"
-			args = []interface{}{nextID, itemNo, itemName, itemUPC, input.CategoryID, input.Price, itemType, obQuantity}
+			args = []interface{}{nextID, itemNo, itemName, upcToSave, input.CategoryID, input.Price, itemType, obQuantity}
 		} else {
 			query = "INSERT INTO ITEM (ITEMNO, ITEMNAME, ITEMUPC, CATEGORYID, DEF_UNITPRICE1, ITEMTYPE, OBQUANTITY, SUPPLIERID, UNIT1) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL)"
-			args = []interface{}{itemNo, itemName, itemUPC, input.CategoryID, input.Price, itemType, obQuantity}
+			args = []interface{}{itemNo, itemName, upcToSave, input.CategoryID, input.Price, itemType, obQuantity}
 		}
 
 		_, err = db.Exec(query, args...)
