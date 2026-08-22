@@ -17,7 +17,7 @@ func GetItems(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		limit, offset := GetPaginationParams(c)
 
-		query := "SELECT FIRST ? SKIP ? ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM ORDER BY ITEMNO ASC"
+		query := "SELECT ITEMNO, ITEMUPC, ITEMNAME, ITEMNAME_SHORT, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY, NOTES FROM ITEM ORDER BY ITEMNO ASC LIMIT ? OFFSET ?"
 		rows, err := db.Query(query, limit, offset)
 		if err != nil {
 			log.Printf("[Error] Query GetItems failed: %v", err)
@@ -29,25 +29,29 @@ func GetItems(db *sql.DB) gin.HandlerFunc {
 		var items []models.Item
 		for rows.Next() {
 			var (
-				itemNo   sql.NullString
-				itemUPC  sql.NullString
-				itemName sql.NullString
-				catID    sql.NullInt64
-				price    sql.NullFloat64
-				obQty    sql.NullFloat64
+				itemNo        sql.NullString
+				itemUPC       sql.NullString
+				itemName      sql.NullString
+				itemNameShort sql.NullString
+				catID         sql.NullInt64
+				price         sql.NullFloat64
+				obQty         sql.NullFloat64
+				notes         sql.NullString
 			)
-			if err := rows.Scan(&itemNo, &itemUPC, &itemName, &catID, &price, &obQty); err != nil {
+			if err := rows.Scan(&itemNo, &itemUPC, &itemName, &itemNameShort, &catID, &price, &obQty, &notes); err != nil {
 				log.Printf("[Error] Scan item failed: %v", err)
 				SendError(c, http.StatusInternalServerError, "Gagal membaca data produk")
 				return
 			}
 			items = append(items, models.Item{
-				ItemNo:     strings.TrimSpace(itemNo.String),
-				ItemUPC:    strings.TrimSpace(itemUPC.String),
-				ItemName:   strings.TrimSpace(itemName.String),
-				CategoryID: int(catID.Int64),
-				Price:      price.Float64,
-				ObQuantity: obQty.Float64,
+				ItemNo:        strings.TrimSpace(itemNo.String),
+				ItemUPC:       strings.TrimSpace(itemUPC.String),
+				ItemName:      strings.TrimSpace(itemName.String),
+				ItemNameShort: strings.TrimSpace(itemNameShort.String),
+				CategoryID:    int(catID.Int64),
+				DefUnitPrice1: price.Float64,
+				ObQuantity:    obQty.Float64,
+				Notes:         strings.TrimSpace(notes.String),
 			})
 		}
 
@@ -74,18 +78,20 @@ func GetItemByNo(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		query := "SELECT ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM WHERE ITEMNO = ?"
+		query := "SELECT ITEMNO, ITEMUPC, ITEMNAME, ITEMNAME_SHORT, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY, NOTES FROM ITEM WHERE ITEMNO = ?"
 		row := db.QueryRow(query, itemNoParam)
 
 		var (
-			itemNo   sql.NullString
-			itemUPC  sql.NullString
-			itemName sql.NullString
-			catID    sql.NullInt64
-			price    sql.NullFloat64
-			obQty    sql.NullFloat64
+			itemNo        sql.NullString
+			itemUPC       sql.NullString
+			itemName      sql.NullString
+			itemNameShort sql.NullString
+			catID         sql.NullInt64
+			price         sql.NullFloat64
+			obQty         sql.NullFloat64
+			notes         sql.NullString
 		)
-		err := row.Scan(&itemNo, &itemUPC, &itemName, &catID, &price, &obQty)
+		err := row.Scan(&itemNo, &itemUPC, &itemName, &itemNameShort, &catID, &price, &obQty, &notes)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				SendError(c, http.StatusNotFound, "Produk tidak ditemukan")
@@ -97,12 +103,14 @@ func GetItemByNo(db *sql.DB) gin.HandlerFunc {
 		}
 
 		item := models.Item{
-			ItemNo:     strings.TrimSpace(itemNo.String),
-			ItemUPC:    strings.TrimSpace(itemUPC.String),
-			ItemName:   strings.TrimSpace(itemName.String),
-			CategoryID: int(catID.Int64),
-			Price:      price.Float64,
-			ObQuantity: obQty.Float64,
+			ItemNo:        strings.TrimSpace(itemNo.String),
+			ItemUPC:       strings.TrimSpace(itemUPC.String),
+			ItemName:      strings.TrimSpace(itemName.String),
+			ItemNameShort: strings.TrimSpace(itemNameShort.String),
+			CategoryID:    int(catID.Int64),
+			DefUnitPrice1: price.Float64,
+			ObQuantity:    obQty.Float64,
+			Notes:         strings.TrimSpace(notes.String),
 		}
 
 		SendSuccess(c, "Data ditemukan", item)
@@ -122,10 +130,10 @@ func SearchItems(db *sql.DB) gin.HandlerFunc {
 
 		// Perform case-insensitive LIKE query using LOWER on name, no, and upc.
 		// Firebird parameter placeholder is ?
-		query := "SELECT FIRST ? SKIP ? ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM WHERE LOWER(ITEMNAME) LIKE ? OR LOWER(ITEMNO) LIKE ? OR LOWER(ITEMUPC) LIKE ? ORDER BY ITEMNAME ASC"
+		query := "SELECT ITEMNO, ITEMUPC, ITEMNAME, ITEMNAME_SHORT, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY, NOTES FROM ITEM WHERE LOWER(ITEMNAME) LIKE ? OR LOWER(ITEMNO) LIKE ? OR LOWER(ITEMUPC) LIKE ? ORDER BY ITEMNAME ASC LIMIT ? OFFSET ?"
 		searchPattern := "%" + strings.ToLower(queryParam) + "%"
 
-		rows, err := db.Query(query, limit, offset, searchPattern, searchPattern, searchPattern)
+		rows, err := db.Query(query, searchPattern, searchPattern, searchPattern, limit, offset)
 		if err != nil {
 			log.Printf("[Error] Query SearchItems failed: %v", err)
 			SendError(c, http.StatusInternalServerError, "Gagal mengakses database untuk mencari produk: "+err.Error())
@@ -136,25 +144,29 @@ func SearchItems(db *sql.DB) gin.HandlerFunc {
 		var items []models.Item
 		for rows.Next() {
 			var (
-				itemNo   sql.NullString
-				itemUPC  sql.NullString
-				itemName sql.NullString
-				catID    sql.NullInt64
-				price    sql.NullFloat64
-				obQty    sql.NullFloat64
+				itemNo        sql.NullString
+				itemUPC       sql.NullString
+				itemName      sql.NullString
+				itemNameShort sql.NullString
+				catID         sql.NullInt64
+				price         sql.NullFloat64
+				obQty         sql.NullFloat64
+				notes         sql.NullString
 			)
-			if err := rows.Scan(&itemNo, &itemUPC, &itemName, &catID, &price, &obQty); err != nil {
+			if err := rows.Scan(&itemNo, &itemUPC, &itemName, &itemNameShort, &catID, &price, &obQty, &notes); err != nil {
 				log.Printf("[Error] Scan item failed: %v", err)
 				SendError(c, http.StatusInternalServerError, "Gagal membaca data produk")
 				return
 			}
 			items = append(items, models.Item{
-				ItemNo:     strings.TrimSpace(itemNo.String),
-				ItemUPC:    strings.TrimSpace(itemUPC.String),
-				ItemName:   strings.TrimSpace(itemName.String),
-				CategoryID: int(catID.Int64),
-				Price:      price.Float64,
-				ObQuantity: obQty.Float64,
+				ItemNo:        strings.TrimSpace(itemNo.String),
+				ItemUPC:       strings.TrimSpace(itemUPC.String),
+				ItemName:      strings.TrimSpace(itemName.String),
+				ItemNameShort: strings.TrimSpace(itemNameShort.String),
+				CategoryID:    int(catID.Int64),
+				DefUnitPrice1: price.Float64,
+				ObQuantity:    obQty.Float64,
+				Notes:         strings.TrimSpace(notes.String),
 			})
 		}
 
@@ -182,10 +194,12 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 		}
 
 		type UpdateItemInput struct {
-			NewItemNo string  `json:"new_itemno" binding:"required"`
-			ItemUPC   string  `json:"itemupc"`
-			Price     float64 `json:"price"`
-			ItemName  string  `json:"itemname"`
+			NewItemNo     string  `json:"new_itemno" binding:"required"`
+			ItemUPC       string  `json:"itemupc"`
+			DefUnitPrice1 float64 `json:"def_unitprice1"`
+			ItemName      string  `json:"itemname"`
+			ItemNameShort string  `json:"itemname_short"`
+			Notes         string  `json:"notes"`
 		}
 
 		var input UpdateItemInput
@@ -211,7 +225,7 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 
 		// First, check if the original item exists in the database
 		var exists int
-		checkQuery := "SELECT FIRST 1 1 FROM ITEM WHERE ITEMNO = ?"
+		checkQuery := "SELECT 1 FROM ITEM WHERE ITEMNO = ? LIMIT 1"
 		err := db.QueryRow(checkQuery, itemNoParam).Scan(&exists)
 		if err != nil {
 			if err == sql.ErrNoRows {
@@ -231,8 +245,8 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 			upcToSave = newItemUPC
 		}
 
-		updateQuery := "UPDATE ITEM SET ITEMNO = ?, ITEMUPC = ?, DEF_UNITPRICE1 = ?, ITEMNAME = ? WHERE ITEMNO = ?"
-		_, err = db.Exec(updateQuery, newItemNo, upcToSave, input.Price, newItemName, itemNoParam)
+		updateQuery := "UPDATE ITEM SET ITEMNO = ?, ITEMUPC = ?, DEF_UNITPRICE1 = ?, ITEMNAME = ?, ITEMNAME_SHORT = ?, NOTES = ? WHERE ITEMNO = ?"
+		_, err = db.Exec(updateQuery, newItemNo, upcToSave, input.DefUnitPrice1, newItemName, input.ItemNameShort, input.Notes, itemNoParam)
 		if err != nil {
 			log.Printf("[Error] Query UpdateItem failed: %v", err)
 			SendError(c, http.StatusInternalServerError, "Gagal memperbarui database produk: "+err.Error())
@@ -240,35 +254,41 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 		}
 
 		// Retrieve updated item details to send back
-		query := "SELECT ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM WHERE ITEMNO = ?"
+		query := "SELECT ITEMNO, ITEMUPC, ITEMNAME, ITEMNAME_SHORT, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY, NOTES FROM ITEM WHERE ITEMNO = ?"
 		row := db.QueryRow(query, newItemNo)
 
 		var (
-			resItemNo   sql.NullString
-			resItemUPC  sql.NullString
-			resItemName sql.NullString
-			resCatID    sql.NullInt64
-			resPrice    sql.NullFloat64
-			resObQty    sql.NullFloat64
+			resItemNo        sql.NullString
+			resItemUPC       sql.NullString
+			resItemName      sql.NullString
+			resItemNameShort sql.NullString
+			resCatID         sql.NullInt64
+			resPrice         sql.NullFloat64
+			resObQty         sql.NullFloat64
+			resNotes         sql.NullString
 		)
-		err = row.Scan(&resItemNo, &resItemUPC, &resItemName, &resCatID, &resPrice, &resObQty)
+		err = row.Scan(&resItemNo, &resItemUPC, &resItemName, &resItemNameShort, &resCatID, &resPrice, &resObQty, &resNotes)
 		if err != nil {
 			log.Printf("[Error] Query GetItemByNo after update failed: %v", err)
 			SendSuccess(c, "Produk berhasil diperbarui", models.Item{
-				ItemNo:   newItemNo,
-				ItemUPC:  newItemUPC,
-				ItemName: newItemName,
+				ItemNo:        newItemNo,
+				ItemUPC:       newItemUPC,
+				ItemName:      newItemName,
+				ItemNameShort: input.ItemNameShort,
+				Notes:         input.Notes,
 			})
 			return
 		}
 
 		updatedItem := models.Item{
-			ItemNo:     strings.TrimSpace(resItemNo.String),
-			ItemUPC:    strings.TrimSpace(resItemUPC.String),
-			ItemName:   strings.TrimSpace(resItemName.String),
-			CategoryID: int(resCatID.Int64),
-			Price:      resPrice.Float64,
-			ObQuantity: resObQty.Float64,
+			ItemNo:        strings.TrimSpace(resItemNo.String),
+			ItemUPC:       strings.TrimSpace(resItemUPC.String),
+			ItemName:      strings.TrimSpace(resItemName.String),
+			ItemNameShort: strings.TrimSpace(resItemNameShort.String),
+			CategoryID:    int(resCatID.Int64),
+			DefUnitPrice1: resPrice.Float64,
+			ObQuantity:    resObQty.Float64,
+			Notes:         strings.TrimSpace(resNotes.String),
 		}
 
 		SendSuccess(c, "Produk berhasil diperbarui", updatedItem)
@@ -279,13 +299,15 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 func CreateItem(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		type CreateItemInput struct {
-			ItemNo     string   `json:"itemno"`
-			ItemName   string   `json:"itemname" binding:"required"`
-			ItemUPC    string   `json:"itemupc"`
-			CategoryID int      `json:"categoryid"`
-			Price      float64  `json:"price"`
-			ItemType   *int     `json:"itemtype"`
-			ObQuantity *float64 `json:"obquantity"`
+			ItemNo        string   `json:"itemno"`
+			ItemName      string   `json:"itemname" binding:"required"`
+			ItemNameShort string   `json:"itemname_short"`
+			ItemUPC       string   `json:"itemupc"`
+			CategoryID    int      `json:"categoryid"`
+			DefUnitPrice1 float64  `json:"def_unitprice1"`
+			ItemType      *int     `json:"itemtype"`
+			ObQuantity    *float64 `json:"obquantity"`
+			Notes         string   `json:"notes"`
 		}
 
 		var input CreateItemInput
@@ -325,33 +347,18 @@ func CreateItem(db *sql.DB) gin.HandlerFunc {
 
 		// Check if ITEMNO already exists to avoid primary/unique key issues
 		var exists int
-		checkQuery := "SELECT FIRST 1 1 FROM ITEM WHERE ITEMNO = ?"
+		checkQuery := "SELECT 1 FROM ITEM WHERE ITEMNO = ? LIMIT 1"
 		db.QueryRow(checkQuery, itemNo).Scan(&exists)
 		if exists > 0 {
 			SendError(c, http.StatusBadRequest, "SKU "+itemNo+" sudah terdaftar")
 			return
 		}
 
-		// Insert product.
-		// We first try to get the next ID from the generator ITEM_GEN
-		var nextID int
-		err := db.QueryRow("SELECT GEN_ID(ITEM_GEN, 1) FROM RDB$DATABASE").Scan(&nextID)
-		if err != nil {
-			log.Printf("[Error] GEN_ID query failed: %v. Attempting insert without ID...", err)
-		}
+		// Insert product without explicit ID, letting SQLite autoincrement it
+		query := "INSERT INTO ITEM (ITEMNO, ITEMNAME, ITEMNAME_SHORT, ITEMUPC, CATEGORYID, DEF_UNITPRICE1, ITEMTYPE, OBQUANTITY, NOTES, SUPPLIERID, UNIT1) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)"
+		args := []interface{}{itemNo, itemName, input.ItemNameShort, upcToSave, input.CategoryID, input.DefUnitPrice1, itemType, obQuantity, input.Notes}
 
-		var query string
-		var args []interface{}
-
-		if nextID > 0 {
-			query = "INSERT INTO ITEM (ID, ITEMNO, ITEMNAME, ITEMUPC, CATEGORYID, DEF_UNITPRICE1, ITEMTYPE, OBQUANTITY, SUPPLIERID, UNIT1) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)"
-			args = []interface{}{nextID, itemNo, itemName, upcToSave, input.CategoryID, input.Price, itemType, obQuantity}
-		} else {
-			query = "INSERT INTO ITEM (ITEMNO, ITEMNAME, ITEMUPC, CATEGORYID, DEF_UNITPRICE1, ITEMTYPE, OBQUANTITY, SUPPLIERID, UNIT1) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL)"
-			args = []interface{}{itemNo, itemName, upcToSave, input.CategoryID, input.Price, itemType, obQuantity}
-		}
-
-		_, err = db.Exec(query, args...)
+		_, err := db.Exec(query, args...)
 		if err != nil {
 			log.Printf("[Error] Query CreateItem failed: %v", err)
 			SendError(c, http.StatusInternalServerError, "Gagal menambahkan produk baru ke database: "+err.Error())
@@ -360,23 +367,27 @@ func CreateItem(db *sql.DB) gin.HandlerFunc {
 
 		// Retrieve created item details to send back
 		var (
-			resItemNo   sql.NullString
-			resItemUPC  sql.NullString
-			resItemName sql.NullString
-			resCatID    sql.NullInt64
-			resPrice    sql.NullFloat64
-			resObQty    sql.NullFloat64
+			resItemNo        sql.NullString
+			resItemUPC       sql.NullString
+			resItemName      sql.NullString
+			resItemNameShort sql.NullString
+			resCatID         sql.NullInt64
+			resPrice         sql.NullFloat64
+			resObQty         sql.NullFloat64
+			resNotes         sql.NullString
 		)
-		db.QueryRow("SELECT ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM WHERE ITEMNO = ?", itemNo).
-			Scan(&resItemNo, &resItemUPC, &resItemName, &resCatID, &resPrice, &resObQty)
+		db.QueryRow("SELECT ITEMNO, ITEMUPC, ITEMNAME, ITEMNAME_SHORT, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY, NOTES FROM ITEM WHERE ITEMNO = ?", itemNo).
+			Scan(&resItemNo, &resItemUPC, &resItemName, &resItemNameShort, &resCatID, &resPrice, &resObQty, &resNotes)
 
 		createdItem := models.Item{
-			ItemNo:     strings.TrimSpace(resItemNo.String),
-			ItemUPC:    strings.TrimSpace(resItemUPC.String),
-			ItemName:   strings.TrimSpace(resItemName.String),
-			CategoryID: int(resCatID.Int64),
-			Price:      resPrice.Float64,
-			ObQuantity: resObQty.Float64,
+			ItemNo:        strings.TrimSpace(resItemNo.String),
+			ItemUPC:       strings.TrimSpace(resItemUPC.String),
+			ItemName:      strings.TrimSpace(resItemName.String),
+			ItemNameShort: strings.TrimSpace(resItemNameShort.String),
+			CategoryID:    int(resCatID.Int64),
+			DefUnitPrice1: resPrice.Float64,
+			ObQuantity:    resObQty.Float64,
+			Notes:         strings.TrimSpace(resNotes.String),
 		}
 
 		SendSuccess(c, "Produk berhasil ditambahkan", createdItem)

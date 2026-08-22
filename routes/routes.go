@@ -35,6 +35,31 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 		api.GET("/items/:itemno", handlers.GetItemByNo(db))
 		api.PUT("/items/:itemno", handlers.UpdateItem(db))
 		api.POST("/items", handlers.CreateItem(db))
+
+		// User routes
+		api.GET("/users", handlers.GetUsers(db))
+		api.POST("/users", handlers.CreateUser(db))
+
+		// Quick Item routes
+		api.GET("/quick-items", handlers.GetQuickItems(db))
+		api.POST("/quick-items", handlers.CreateQuickItem(db))
+
+		// Sales routes
+		api.GET("/sales", handlers.GetSales(db))
+		api.POST("/sales", handlers.CreateSale(db))
+		api.PATCH("/sales/:invoiceno/status", handlers.UpdateSaleStatus(db))
+
+		// Cash Reconciliation routes
+		api.GET("/cash-reconciliations", handlers.GetCashReconciliations(db))
+		api.POST("/cash-reconciliations", handlers.CreateCashReconciliation(db))
+
+		// Audit Log routes
+		api.GET("/audit-logs", handlers.GetAuditLogs(db))
+		api.POST("/audit-logs", handlers.CreateAuditLog(db))
+
+		// Company routes
+		api.GET("/company", handlers.GetCompany(db))
+		api.PUT("/company", handlers.UpdateCompany(db))
 	}
 
 	return r

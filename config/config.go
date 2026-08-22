@@ -10,11 +10,7 @@ import (
 // Config holds the configuration values for the application.
 type Config struct {
 	ServerPort string
-	DBHost     string
-	DBPort     string
 	DBPath     string
-	DBUser     string
-	DBPassword string
 }
 
 // LoadConfig loads the configuration from environment variables and .env file.
@@ -25,11 +21,7 @@ func LoadConfig() (*Config, error) {
 
 	cfg := &Config{
 		ServerPort: getEnv("SERVER_PORT", "8080"),
-		DBHost:     getEnv("DB_HOST", "127.0.0.1"),
-		DBPort:     getEnv("DB_PORT", "3051"),
 		DBPath:     getEnv("DB_PATH", ""),
-		DBUser:     getEnv("DB_USER", "pos"),
-		DBPassword: getEnv("DB_PASSWORD", "pos"),
 	}
 
 	if cfg.DBPath == "" {

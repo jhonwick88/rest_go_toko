@@ -68,8 +68,8 @@ func GetCategoryItems(db *sql.DB) gin.HandlerFunc {
 
 		limit, offset := GetPaginationParams(c)
 
-		query := "SELECT FIRST ? SKIP ? ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM WHERE CATEGORYID = ? ORDER BY ITEMNAME ASC"
-		rows, err := db.Query(query, limit, offset, categoryID)
+		query := "SELECT ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM WHERE CATEGORYID = ? ORDER BY ITEMNAME ASC LIMIT ? OFFSET ?"
+		rows, err := db.Query(query, categoryID, limit, offset)
 		if err != nil {
 			log.Printf("[Error] Query GetCategoryItems failed: %v", err)
 			SendError(c, http.StatusInternalServerError, "Gagal mengakses database untuk mengambil produk: "+err.Error())
@@ -80,12 +80,12 @@ func GetCategoryItems(db *sql.DB) gin.HandlerFunc {
 		var items []models.Item
 		for rows.Next() {
 			var (
-				itemNo     sql.NullString
-				itemUPC    sql.NullString
-				itemName   sql.NullString
-				catID      sql.NullInt64
-				price      sql.NullFloat64
-				obQty      sql.NullFloat64
+				itemNo   sql.NullString
+				itemUPC  sql.NullString
+				itemName sql.NullString
+				catID    sql.NullInt64
+				price    sql.NullFloat64
+				obQty    sql.NullFloat64
 			)
 			if err := rows.Scan(&itemNo, &itemUPC, &itemName, &catID, &price, &obQty); err != nil {
 				log.Printf("[Error] Scan item failed: %v", err)
@@ -93,12 +93,12 @@ func GetCategoryItems(db *sql.DB) gin.HandlerFunc {
 				return
 			}
 			items = append(items, models.Item{
-				ItemNo:     stringsTrim(itemNo.String),
-				ItemUPC:    stringsTrim(itemUPC.String),
-				ItemName:   stringsTrim(itemName.String),
-				CategoryID: int(catID.Int64),
-				Price:      price.Float64,
-				ObQuantity: obQty.Float64,
+				ItemNo:        stringsTrim(itemNo.String),
+				ItemUPC:       stringsTrim(itemUPC.String),
+				ItemName:      stringsTrim(itemName.String),
+				CategoryID:    int(catID.Int64),
+				DefUnitPrice1: price.Float64,
+				ObQuantity:    obQty.Float64,
 			})
 		}
 

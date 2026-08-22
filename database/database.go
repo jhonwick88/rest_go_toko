@@ -4,34 +4,26 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"rest_go_toko/config"
 
-	_ "github.com/nakagami/firebirdsql"
+	_ "modernc.org/sqlite"
 )
 
-// InitDB initializes the connection pool to the Firebird database.
+// InitDB initializes the connection pool to the SQLite database.
 func InitDB(cfg *config.Config) (*sql.DB, error) {
-	// Normalize Windows file path backslashes to forward slashes for URI compatibility.
-	normalizedPath := strings.ReplaceAll(cfg.DBPath, "\\", "/")
+	log.Printf("Connecting to SQLite database at %s...", cfg.DBPath)
 
-	// Construct connection string: user:password@host:port/path?charset=UTF8
-	// Format is compatible with github.com/nakagami/firebirdsql driver.
-	dsn := fmt.Sprintf("%s:%s@%s:%s/%s?charset=UTF8",
-		cfg.DBUser,
-		cfg.DBPassword,
-		cfg.DBHost,
-		cfg.DBPort,
-		normalizedPath,
-	)
-
-	log.Printf("Connecting to Firebird database at %s:%s/%s...", cfg.DBHost, cfg.DBPort, normalizedPath)
-
-	db, err := sql.Open("firebirdsql", dsn)
+	// Open connection to SQLite
+	db, err := sql.Open("sqlite", cfg.DBPath)
 	if err != nil {
-		return nil, fmt.Errorf("error opening firebird connection: %w", err)
+		return nil, fmt.Errorf("error opening sqlite connection: %w", err)
+	}
+
+	// Enable Foreign Keys for SQLite
+	if _, err := db.Exec("PRAGMA foreign_keys = ON;"); err != nil {
+		return nil, fmt.Errorf("error enabling foreign keys: %w", err)
 	}
 
 	// Configure Connection Pooling
@@ -43,9 +35,9 @@ func InitDB(cfg *config.Config) (*sql.DB, error) {
 	// Test connection
 	if err := db.Ping(); err != nil {
 		db.Close()
-		return nil, fmt.Errorf("error pinging firebird database: %w", err)
+		return nil, fmt.Errorf("error pinging sqlite database: %w", err)
 	}
 
-	log.Println("Firebird database connection established successfully")
+	log.Println("SQLite database connection established successfully")
 	return db, nil
 }
