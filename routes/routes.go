@@ -15,6 +15,7 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
+	r.Use(middleware.CORSMiddleware())
 
 	// Activation Route (Unprotected)
 	r.POST("/api/license/activate", handlers.ActivateLicense)
@@ -62,3 +63,4 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 
 	return r
 }
+

@@ -22,7 +22,7 @@ func InitDB(cfg *config.Config) (*sql.DB, error) {
 	}
 
 	// Enable Foreign Keys for SQLite
-	if _, err := db.Exec("PRAGMA foreign_keys = ON;"); err != nil {
+	if _, err := db.Exec("PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000; PRAGMA foreign_keys = ON;"); err != nil {
 		return nil, fmt.Errorf("error enabling foreign keys: %w", err)
 	}
 
@@ -41,3 +41,4 @@ func InitDB(cfg *config.Config) (*sql.DB, error) {
 	log.Println("SQLite database connection established successfully")
 	return db, nil
 }
+
