@@ -16,9 +16,21 @@ import (
 func GetSales(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		limit, offset := GetPaginationParams(c)
+		startDate := c.Query("start_date")
+		endDate := c.Query("end_date")
 
-		query := "SELECT ID, INVOICE_NO, DATE, CASHIER, SUBTOTAL, DISCOUNT, GRAND_TOTAL, TAX, PAYMENT_METHOD, PAID_AMOUNT, CHANGE_AMOUNT, STATUS, VOID_REASON, VOIDED_AT, VOIDED_BY, REFUND_REASON, REFUNDED_AT, REFUNDED_BY, CUSTOMER_ID, IS_VOID FROM SALES ORDER BY DATE DESC LIMIT ? OFFSET ?"
-		rows, err := db.Query(query, limit, offset)
+		var query string
+		var args []interface{}
+		
+		if startDate != "" && endDate != "" {
+			query = "SELECT ID, INVOICE_NO, DATE, CASHIER, SUBTOTAL, DISCOUNT, GRAND_TOTAL, TAX, PAYMENT_METHOD, PAID_AMOUNT, CHANGE_AMOUNT, STATUS, VOID_REASON, VOIDED_AT, VOIDED_BY, REFUND_REASON, REFUNDED_AT, REFUNDED_BY, CUSTOMER_ID, IS_VOID FROM SALES WHERE DATE >= ? AND DATE <= ? ORDER BY DATE DESC LIMIT ? OFFSET ?"
+			args = []interface{}{startDate, endDate, limit, offset}
+		} else {
+			query = "SELECT ID, INVOICE_NO, DATE, CASHIER, SUBTOTAL, DISCOUNT, GRAND_TOTAL, TAX, PAYMENT_METHOD, PAID_AMOUNT, CHANGE_AMOUNT, STATUS, VOID_REASON, VOIDED_AT, VOIDED_BY, REFUND_REASON, REFUNDED_AT, REFUNDED_BY, CUSTOMER_ID, IS_VOID FROM SALES ORDER BY DATE DESC LIMIT ? OFFSET ?"
+			args = []interface{}{limit, offset}
+		}
+		
+		rows, err := db.Query(query, args...)
 		if err != nil {
 			log.Printf("[Error] Query GetSales failed: %v", err)
 			SendError(c, http.StatusInternalServerError, "Gagal mengambil data penjualan")

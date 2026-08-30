@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"rest_go_toko/services"
 	"database/sql"
 	"log"
 	"net/http"
@@ -45,6 +46,20 @@ func GetUsers(db *sql.DB) gin.HandlerFunc {
 // CreateUser creates a new user
 func CreateUser(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// --- LICENSE CHECK ---
+		features := services.GetLicenseFeatures()
+		if features != nil {
+			if maxUsers, ok := features["max_users"].(float64); ok && maxUsers > 0 {
+				var count int
+				db.QueryRow("SELECT COUNT(*) FROM USERS").Scan(&count)
+				if float64(count) >= maxUsers {
+					SendError(c, 403, "Batas maksimal pengguna dari lisensi Anda telah tercapai.")
+					return
+				}
+			}
+		}
+		// --- END LICENSE CHECK ---
+		
 		var input models.User
 		if err := c.ShouldBindJSON(&input); err != nil {
 			SendError(c, http.StatusBadRequest, "Payload request tidak valid")

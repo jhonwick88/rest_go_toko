@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"rest_go_toko/services"
 	"database/sql"
 	"log"
 	"net/http"
@@ -298,6 +299,20 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 // CreateItem creates a new item in the database.
 func CreateItem(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// --- LICENSE CHECK ---
+		features := services.GetLicenseFeatures()
+		if features != nil {
+			if maxProducts, ok := features["max_products"].(float64); ok && maxProducts > 0 {
+				var count int
+				db.QueryRow("SELECT COUNT(*) FROM ITEM").Scan(&count)
+				if float64(count) >= maxProducts {
+					SendError(c, 403, "Batas maksimal produk dari lisensi Anda telah tercapai.")
+					return
+				}
+			}
+		}
+		// --- END LICENSE CHECK ---
+
 		type CreateItemInput struct {
 			ItemNo        string   `json:"itemno"`
 			ItemName      string   `json:"itemname" binding:"required"`

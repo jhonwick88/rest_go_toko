@@ -125,3 +125,35 @@ func ActivateLicense(licenseKey string) error {
 
 	return nil
 }
+
+// GetLicenseFeatures decodes the JWT and returns the features map
+func GetLicenseFeatures() map[string]interface{} {
+	data, err := os.ReadFile(licenseFile)
+	if err != nil {
+		return nil
+	}
+	
+	tokenStr := strings.TrimSpace(string(data))
+	if tokenStr == "" {
+		return nil
+	}
+
+	parts := strings.Split(tokenStr, ".")
+	if len(parts) != 2 {
+		return nil
+	}
+
+	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return nil
+	}
+
+	var claims struct {
+		Features map[string]interface{} json:"features"
+	}
+	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
+		return nil
+	}
+
+	return claims.Features
+}
