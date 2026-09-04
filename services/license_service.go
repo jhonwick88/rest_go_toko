@@ -2,8 +2,8 @@ package services
 
 import (
 	"bytes"
-	"encoding/json"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,10 +15,10 @@ import (
 	"github.com/denisbrodbeck/machineid"
 )
 
-const (
-	licenseFile   = "license.token"
-	activateURL   = "http://localhost:8080/api/v1/license/activate"
-)
+const licenseFile = "license.token"
+
+// activateURL can be overridden at build time using -ldflags "-X rest_go_toko/services.activateURL=http://172.16.0.137/api/v1/license/activate"
+var activateURL = "http://localhost:8080/api/v1/license/activate"
 
 // GetMachineFingerprint retrieves a permanent Hardware ID for this machine.
 func GetMachineFingerprint() (string, error) {
@@ -35,7 +35,7 @@ func HasValidLicense() bool {
 	if err != nil {
 		return false
 	}
-	
+
 	tokenStr := strings.TrimSpace(string(data))
 	if tokenStr == "" {
 		return false
@@ -132,7 +132,7 @@ func GetLicenseFeatures() map[string]interface{} {
 	if err != nil {
 		return nil
 	}
-	
+
 	tokenStr := strings.TrimSpace(string(data))
 	if tokenStr == "" {
 		return nil
@@ -149,11 +149,59 @@ func GetLicenseFeatures() map[string]interface{} {
 	}
 
 	var claims struct {
-		Features map[string]interface{} json:"features"
+		Features map[string]interface{} `json:"features"`
 	}
 	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
 		return nil
 	}
 
 	return claims.Features
+}
+
+
+type LicenseClaims struct {
+	LicenseID          string                 `json:"license_id"`
+	ProductID          string                 `json:"product_id"`
+	CustomerID         string                 `json:"customer_id"`
+	PlanID             string                 `json:"plan_id"`
+	InstallationID     string                 `json:"installation_id"`
+	MachineFingerprint string                 `json:"machine_fingerprint"`
+	Features           map[string]interface{} `json:"features"`
+}
+
+// GetLicenseClaims decodes the license.token and returns the full claims
+func GetLicenseClaims() (*LicenseClaims, error) {
+	data, err := os.ReadFile(licenseFile)
+	if err != nil {
+		return nil, errors.New("license not found")
+	}
+
+	tokenStr := strings.TrimSpace(string(data))
+	if tokenStr == "" {
+		return nil, errors.New("license is empty")
+	}
+
+	parts := strings.Split(tokenStr, ".")
+	if len(parts) != 2 && len(parts) != 3 {
+		return nil, errors.New("invalid license token format")
+	}
+
+	var payloadIdx int
+	if len(parts) == 3 {
+		payloadIdx = 1 // Standard JWT: header.payload.signature
+	} else if len(parts) == 2 {
+		payloadIdx = 0 // Custom token: payload.signature
+	}
+
+	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[payloadIdx])
+	if err != nil {
+		return nil, errors.New("failed to decode license payload")
+	}
+
+	var claims LicenseClaims
+	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
+		return nil, errors.New("failed to parse license claims")
+	}
+
+	return &claims, nil
 }

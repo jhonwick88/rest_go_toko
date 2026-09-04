@@ -19,6 +19,7 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 
 	// Activation Route (Unprotected)
 	r.POST("/api/license/activate", handlers.ActivateLicense)
+	r.GET("/api/license/status", handlers.GetLicenseStatus)
 
 	// API Group (Protected by License Middleware)
 	api := r.Group("/api")
@@ -34,6 +35,9 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 		api.GET("/items/:itemno", handlers.GetItemByNo(db))
 		api.PUT("/items/:itemno", handlers.UpdateItem(db))
 		api.POST("/items", handlers.CreateItem(db))
+		api.DELETE("/items/:itemno", handlers.DeleteItem(db))
+		api.PATCH("/items/:itemno/stock", handlers.UpdateStock(db))
+		api.GET("/items/barcode/:barcode", handlers.GetItemsByBarcode(db))
 
 		// User routes
 		api.GET("/users", handlers.GetUsers(db))
@@ -52,6 +56,23 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 		api.GET("/cash-reconciliations", handlers.GetCashReconciliations(db))
 		api.POST("/cash-reconciliations", handlers.CreateCashReconciliation(db))
 
+		// Unit routes
+		api.GET("/units", handlers.GetUnits(db))
+		api.POST("/units", handlers.CreateUnit(db))
+		api.PUT("/units/:id", handlers.UpdateUnit(db))
+		api.DELETE("/units/:id", handlers.DeleteUnit(db))
+
+		// PRO features (protected)
+		proGroup := api.Group("")
+		{
+			// Supplier Management
+			proGroup.GET("/suppliers", middleware.RequireFeature("supplier_management"), handlers.GetSuppliers(db))
+			proGroup.POST("/suppliers", middleware.RequireFeature("supplier_management"), handlers.CreateSupplier(db))
+			
+			// Stock Movement
+			proGroup.GET("/stock-ledger/:itemno", middleware.RequireFeature("stock_movement"), handlers.GetStockLedger(db))
+		}
+
 		// Audit Log routes
 		api.GET("/audit-logs", handlers.GetAuditLogs(db))
 		api.POST("/audit-logs", handlers.CreateAuditLog(db))
@@ -59,6 +80,10 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 		// Company routes
 		api.GET("/company", handlers.GetCompany(db))
 		api.PUT("/company", handlers.UpdateCompany(db))
+
+		// System routes
+		api.GET("/backup", handlers.BackupDatabase(db))
+		api.POST("/restore", handlers.RestoreDatabase(db))
 	}
 
 	return r

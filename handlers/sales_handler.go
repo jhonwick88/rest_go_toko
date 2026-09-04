@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"rest_go_toko/services"
 )
 
 // GetSales returns all sales headers
@@ -162,22 +163,91 @@ func CreateSale(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Check specific Pro Features
+		hasStockMovement := false
+		hasAdvancedPos := false
+		if claims, err := services.GetLicenseClaims(); err == nil && claims != nil {
+			if smFlag, ok := claims.Features["stock_movement"].(bool); ok {
+				hasStockMovement = smFlag
+			}
+			if apFlag, ok := claims.Features["advanced_pos"].(bool); ok {
+				hasAdvancedPos = apFlag
+			}
+		}
+
 		// Insert Items
 		var maxID int
 		_ = tx.QueryRow("SELECT COALESCE(MAX(ID), 0) FROM SALES_ITEMS").Scan(&maxID)
 
-		itemQuery := "INSERT INTO SALES_ITEMS (ID, INVOICE_NO, ITEMNO, ITEMNAME, ITEMUPC, QTY, PRICE, DISCOUNT, SUBTOTAL, NOTE) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+		itemQuery := "INSERT INTO SALES_ITEMS (ID, INVOICE_NO, ITEMNO, ITEMNAME, ITEMUPC, QTY, PRICE, DISCOUNT, SUBTOTAL, NOTE, TAX) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+		updateStockQuery := "UPDATE ITEM SET OBQUANTITY = OBQUANTITY - ? WHERE ITEMNO = ?"
+		stockLedgerQuery := "INSERT INTO STOCK_LEDGER (ITEMNO, TX_TYPE, QTY, NOTES, REFERENCE_ID, TIMESTAMP) VALUES (?, 'OUT', ?, 'Sale', ?, ?)"
+		
 		for i, item := range req.Items {
 			maxID++
-			_, err = tx.Exec(itemQuery, maxID, req.ReceiptNo, item.ItemNo, item.ItemName, item.ItemUPC, item.Qty, item.Price, item.Discount, item.Total, item.Note)
+			
+			noteToSave := item.Note
+			if item.UnitName != "" {
+				if noteToSave != "" {
+					noteToSave += " | "
+				}
+				noteToSave += "Satuan: " + item.UnitName
+			}
+			
+			// Only allow saving Tax if advanced_pos is enabled
+			itemTax := 0.0
+			if hasAdvancedPos {
+				itemTax = item.Tax
+			}
+
+			_, err = tx.Exec(itemQuery, maxID, req.ReceiptNo, item.ItemNo, item.ItemName, item.ItemUPC, item.Qty, item.Price, item.Discount, item.Total, noteToSave, itemTax)
 			if err != nil {
 				tx.Rollback()
 				log.Printf("[Error] Insert Sales Item failed: %v", err)
 				SendError(c, http.StatusInternalServerError, "Gagal menyimpan data barang transaksi")
 				return
 			}
+
+			// Deduct stock based on ratio
+			qtyToDeduct := item.Qty
+			if item.Ratio > 0 {
+				qtyToDeduct = item.Qty * item.Ratio
+			}
+			
+			_, err = tx.Exec(updateStockQuery, qtyToDeduct, item.ItemNo)
+			if err != nil {
+				tx.Rollback()
+				log.Printf("[Error] Update Stock failed: %v", err)
+				SendError(c, http.StatusInternalServerError, "Gagal mengurangi stok produk")
+				return
+			}
+
+			if hasStockMovement {
+				_, err = tx.Exec(stockLedgerQuery, item.ItemNo, -qtyToDeduct, req.ReceiptNo, nowDate)
+				if err != nil {
+					tx.Rollback()
+					log.Printf("[Error] Insert Stock Ledger failed: %v", err)
+					SendError(c, http.StatusInternalServerError, "Gagal mencatat mutasi stok")
+					return
+				}
+			}
+
 			req.Items[i].ID = maxID
 			req.Items[i].SaleID = req.ReceiptNo
+		}
+
+		// Insert Payments if advanced_pos is enabled and payments exist
+		if hasAdvancedPos && len(req.Payments) > 0 {
+			paymentQuery := "INSERT INTO SALES_PAYMENTS (INVOICENO, PAYMENT_METHOD, AMOUNT, PAYMENT_DATE) VALUES (?, ?, ?, ?)"
+			for _, payment := range req.Payments {
+				_, err = tx.Exec(paymentQuery, req.ReceiptNo, payment.PaymentMethod, payment.Amount, nowDate)
+				if err != nil {
+					tx.Rollback()
+					log.Printf("[Error] Insert Sales Payment failed: %v", err)
+					SendError(c, http.StatusInternalServerError, "Gagal menyimpan detail pembayaran")
+					return
+				}
+			}
 		}
 
 		// Commit transaction

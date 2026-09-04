@@ -23,7 +23,8 @@ type Sales struct {
 	RefundedBy    string  `json:"refunded_by,omitempty"`
 	CustomerID    *int    `json:"customer_id,omitempty"`
 	IsVoid        int     `json:"is_void"`
-	Items         []SalesItem `json:"items"`
+	Items         []SalesItem    `json:"items"`
+	Payments      []SalesPayment `json:"payments,omitempty"`
 }
 
 // SalesItem represents the SALES_ITEMS table schema.
@@ -36,8 +37,13 @@ type SalesItem struct {
 	Qty      float64 `json:"qty"`
 	Price    float64 `json:"price"`
 	Discount float64 `json:"discount"`
+	Tax      float64 `json:"tax"`
 	Total    float64 `json:"total"`
 	Note     string  `json:"note"`
+	
+	// Temporary fields from frontend request (not saved directly to DB columns, but used for logic)
+	UnitName string  `json:"unit_name,omitempty"`
+	Ratio    float64 `json:"ratio,omitempty"`
 }
 
 // CreateSalesRequest represents the payload for creating a new sale with its items.
