@@ -116,6 +116,116 @@ func GetCategoryItems(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
+// CreateCategory handles adding a new category
+func CreateCategory(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var input models.Category
+		if err := c.ShouldBindJSON(&input); err != nil {
+			SendError(c, http.StatusBadRequest, "Data tidak valid: "+err.Error())
+			return
+		}
+
+		if strings.TrimSpace(input.Name) == "" {
+			SendError(c, http.StatusBadRequest, "Nama kategori tidak boleh kosong")
+			return
+		}
+
+		query := "INSERT INTO ITEM_CATEGORY (NAME) VALUES (?)"
+		result, err := db.Exec(query, strings.TrimSpace(input.Name))
+		if err != nil {
+			log.Printf("[Error] Query CreateCategory failed: %v", err)
+			SendError(c, http.StatusInternalServerError, "Gagal menambahkan kategori: "+err.Error())
+			return
+		}
+
+		id, _ := result.LastInsertId()
+		input.ID = int(id)
+
+		SendSuccess(c, "Kategori berhasil ditambahkan", input)
+	}
+}
+
+// UpdateCategory handles updating an existing category
+func UpdateCategory(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		idParam := c.Param("id")
+		categoryID, err := strconv.Atoi(idParam)
+		if err != nil {
+			SendError(c, http.StatusBadRequest, "ID kategori tidak valid")
+			return
+		}
+
+		var input models.Category
+		if err := c.ShouldBindJSON(&input); err != nil {
+			SendError(c, http.StatusBadRequest, "Data tidak valid: "+err.Error())
+			return
+		}
+
+		if strings.TrimSpace(input.Name) == "" {
+			SendError(c, http.StatusBadRequest, "Nama kategori tidak boleh kosong")
+			return
+		}
+
+		query := "UPDATE ITEM_CATEGORY SET NAME = ? WHERE ID = ?"
+		res, err := db.Exec(query, strings.TrimSpace(input.Name), categoryID)
+		if err != nil {
+			log.Printf("[Error] Query UpdateCategory failed: %v", err)
+			SendError(c, http.StatusInternalServerError, "Gagal mengupdate kategori: "+err.Error())
+			return
+		}
+
+		rowsAffected, _ := res.RowsAffected()
+		if rowsAffected == 0 {
+			SendError(c, http.StatusNotFound, "Kategori tidak ditemukan")
+			return
+		}
+
+		input.ID = categoryID
+		SendSuccess(c, "Kategori berhasil diupdate", input)
+	}
+}
+
+// DeleteCategory handles deleting a category
+func DeleteCategory(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		idParam := c.Param("id")
+		categoryID, err := strconv.Atoi(idParam)
+		if err != nil {
+			SendError(c, http.StatusBadRequest, "ID kategori tidak valid")
+			return
+		}
+
+		// Check if category is used by any items
+		var count int
+		err = db.QueryRow("SELECT COUNT(*) FROM ITEM WHERE CATEGORYID = ?", categoryID).Scan(&count)
+		if err != nil {
+			log.Printf("[Error] Check items for category failed: %v", err)
+			SendError(c, http.StatusInternalServerError, "Gagal mengecek penggunaan kategori")
+			return
+		}
+		if count > 0 {
+			SendError(c, http.StatusConflict, "Kategori tidak dapat dihapus karena masih digunakan oleh produk")
+			return
+		}
+
+		query := "DELETE FROM ITEM_CATEGORY WHERE ID = ?"
+		res, err := db.Exec(query, categoryID)
+		if err != nil {
+			log.Printf("[Error] Query DeleteCategory failed: %v", err)
+			SendError(c, http.StatusInternalServerError, "Gagal menghapus kategori: "+err.Error())
+			return
+		}
+
+		rowsAffected, _ := res.RowsAffected()
+		if rowsAffected == 0 {
+			SendError(c, http.StatusNotFound, "Kategori tidak ditemukan")
+			return
+		}
+
+		SendSuccess(c, "Kategori berhasil dihapus", nil)
+	}
+}
+
 // Helper function to trim spaces (Firebird CHAR fields are space-padded to their max length)
 func stringsTrim(s string) string {
 	return strings.TrimSpace(s)

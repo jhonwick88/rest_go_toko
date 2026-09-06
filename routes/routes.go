@@ -19,6 +19,7 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 
 	// Activation Route (Unprotected)
 	r.POST("/api/license/activate", handlers.ActivateLicense)
+	r.POST("/api/license/trial", handlers.RequestTrialLicense)
 	r.GET("/api/license/status", handlers.GetLicenseStatus)
 
 	// API Group (Protected by License Middleware)
@@ -28,6 +29,9 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 		// Category routes
 		api.GET("/categories", handlers.GetCategories(db))
 		api.GET("/categories/:id/items", handlers.GetCategoryItems(db))
+		api.POST("/categories", handlers.CreateCategory(db))
+		api.PUT("/categories/:id", handlers.UpdateCategory(db))
+		api.DELETE("/categories/:id", handlers.DeleteCategory(db))
 
 		// Item routes
 		api.GET("/items", handlers.GetItems(db))

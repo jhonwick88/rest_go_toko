@@ -40,6 +40,29 @@ func ActivateLicense(c *gin.Context) {
 	})
 }
 
+// RequestTrialLicense handles the POST request to start a trial license.
+func RequestTrialLicense(c *gin.Context) {
+	err := services.RequestTrialLicense()
+	if err != nil {
+		c.JSON(http.StatusPaymentRequired, gin.H{
+			"error":   "Trial request failed",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	claims, _ := services.GetLicenseClaims()
+	var features map[string]interface{}
+	if claims != nil {
+		features = claims.Features
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Trial license activated successfully",
+		"features": features,
+	})
+}
+
 
 // GetLicenseStatus returns the current license status and features
 func GetLicenseStatus(c *gin.Context) {
