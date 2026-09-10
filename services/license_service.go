@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -17,9 +18,14 @@ import (
 
 const licenseFile = "license.token"
 
-// activateURL can be overridden at build time using -ldflags "-X rest_go_toko/services.activateURL=http://172.16.0.137/api/v1/license/activate"
+// activateURL can be overridden at build time using -ldflags "-X rest_go_toko/services.activateURL=http://172.16.0.137:8080/api/v1/license/activate"
 var activateURL = "http://localhost:8080/api/v1/license/activate"
 var trialURL = "http://localhost:8080/api/v1/license/trial"
+
+func init() {
+	log.Printf("License Service initialized. Activate URL: %s", activateURL)
+	log.Printf("License Service initialized. Trial URL: %s", trialURL)
+}
 
 // GetMachineFingerprint retrieves a permanent Hardware ID for this machine.
 func GetMachineFingerprint() (string, error) {
@@ -88,6 +94,7 @@ func ActivateLicense(licenseKey string) error {
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
+	log.Printf("Mengirim permintaan aktivasi lisensi ke URL: %s", activateURL)
 	resp, err := client.Post(activateURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to connect to license server: %v", err)
@@ -136,6 +143,7 @@ func RequestTrialLicense() error {
 
 	payload := map[string]string{
 		"machine_fingerprint": fingerprint,
+		"product_code":        "TP-POS",
 		"app_version":         "1.0.0",
 		"hostname":            "TokoPintar-Server",
 		"platform":            "windows-server",
@@ -147,6 +155,7 @@ func RequestTrialLicense() error {
 	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
+	log.Printf("Mengirim permintaan trial lisensi ke URL: %s", trialURL)
 	resp, err := client.Post(trialURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to connect to license server: %v", err)
@@ -217,7 +226,6 @@ func GetLicenseFeatures() map[string]interface{} {
 
 	return claims.Features
 }
-
 
 type LicenseClaims struct {
 	LicenseID          string                 `json:"license_id"`

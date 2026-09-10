@@ -50,6 +50,7 @@ func main() {
 	// 5. Start HTTP server in a goroutine
 	go func() {
 		log.Printf("Server is running on port %s", cfg.ServerPort)
+
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("Server ListenAndServe failed: %v", err)
 		}
