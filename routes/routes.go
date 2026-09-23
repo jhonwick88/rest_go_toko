@@ -46,6 +46,8 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 		// User routes
 		api.GET("/users", handlers.GetUsers(db))
 		api.POST("/users", handlers.CreateUser(db))
+		api.PUT("/users/:uid", handlers.UpdateUser(db))
+		api.DELETE("/users/:uid", handlers.DeleteUser(db))
 
 		// Quick Item routes
 		api.GET("/quick-items", handlers.GetQuickItems(db))
@@ -59,6 +61,11 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 		// Cash Reconciliation routes
 		api.GET("/cash-reconciliations", handlers.GetCashReconciliations(db))
 		api.POST("/cash-reconciliations", handlers.CreateCashReconciliation(db))
+
+		// Cash Movements (Petty cash / Kas Keluar) routes
+		api.GET("/cash-movements", handlers.GetCashMovements(db))
+		api.POST("/cash-movements", handlers.CreateCashMovement(db))
+		api.DELETE("/cash-movements/:id", handlers.DeleteCashMovement(db))
 
 		// Unit routes
 		api.GET("/units", handlers.GetUnits(db))

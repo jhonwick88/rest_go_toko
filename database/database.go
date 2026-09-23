@@ -33,9 +33,30 @@ func InitDB(cfg *config.Config) (*sql.DB, error) {
 	db.SetConnMaxIdleTime(15 * time.Minute) // Maximum amount of time a connection may be idle.
 
 	// Test connection
-	if err := db.Ping(); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("error pinging sqlite database: %w", err)
+	// Ensure required tables exist
+	migrationQuery := `
+	CREATE TABLE IF NOT EXISTS CASH_MOVEMENTS (
+		ID TEXT PRIMARY KEY,
+		DATE TEXT NOT NULL,
+		CASHIER_NAME TEXT NOT NULL,
+		TYPE TEXT NOT NULL DEFAULT 'OUT',
+		CATEGORY TEXT NOT NULL,
+		AMOUNT REAL NOT NULL,
+		NOTES TEXT
+	);
+	CREATE TABLE IF NOT EXISTS CASH_RECONCILIATIONS (
+		ID TEXT PRIMARY KEY,
+		DATE TEXT NOT NULL,
+		CASHIER_NAME TEXT,
+		SYSTEM_REVENUE REAL,
+		ACTUAL_DRAWER_CASH REAL,
+		DIFFERENCE REAL,
+		ACCURACY_RATE REAL,
+		NOTES TEXT
+	);
+	`
+	if _, err := db.Exec(migrationQuery); err != nil {
+		log.Printf("[Warning] Failed to run table migrations: %v", err)
 	}
 
 	log.Println("SQLite database connection established successfully")

@@ -1,0 +1,61 @@
+====================================================================
+PANDUAN BUILD & DEPLOY REST_GO_TOKO UNTUK SYNOLOGY DS223J (ARM64)
+====================================================================
+
+1. CARA BUILD BINARY DI WINDOWS (POWERSHELL)
+---------------------------------------------
+Buka PowerShell di folder rest_go_toko, lalu jalankan perintah:
+
+cd h:\FlutterProject\rest_go_toko
+$env:GOOS="linux";$env:GOARCH="arm64";$env:CGO_ENABLED="0";go build -ldflags="-s -w" -o restToko-arm64
+
+Hasil build: File binary bernama "restToko-arm64".
+
+
+2. ISI FILE .env UNTUK SYNOLOGY
+---------------------------------------------
+Buat file teks bernama ".env" di folder yang sama dengan restToko-arm64:
+
+DB_PATH=/volume1/data/pos/toko_pintar_demo.db
+SERVER_PORT=8181
+
+*Catatan: Sesuaikan "/volume1/data/pos/" dengan nama share folder di Synology Anda.
+
+
+3. CARA UPLOAD KE SYNOLOGY
+---------------------------------------------
+1. Buka browser -> Login ke DSM Synology.
+2. Buka "File Station", buat folder (contoh: /volume1/data/pos/).
+3. Upload 3 file ke folder tersebut:
+   - restToko-arm64
+   - .env
+   - toko_pintar_demo.db (database SQLite Anda)
+
+
+4. CARA MENJALANKAN (AUTO-START VIA TASK SCHEDULER DSM)
+--------------------------------------------------------
+1. Di DSM Synology, buka: Control Panel > Task Scheduler (Penjadwal Tugas).
+2. Klik: Create > Triggered Task > User-defined script.
+3. Tab "General":
+   - Task: TokoPintar Backend
+   - User: root
+   - Event: Boot-up
+4. Tab "Task Settings", masukkan perintah:
+
+cd /volume1/data/pos
+chmod +x restToko-arm64
+nohup ./restToko-arm64 > server.log 2>&1 &
+
+5. Klik OK.
+6. Untuk langsung menjalankannya: Klik task tersebut > Klik tombol "Run".
+
+
+5. CEK STATUS SERVER
+---------------------------------------------
+- Buka file "server.log" di folder /volume1/data/pos/ melalui File Station.
+- Jika berhasil, akan muncul tulisan:
+  "Server is running on port 8181"
+- Di aplikasi Flutter TokoPintar POS, arahkan URL API ke:
+  http://IP_SYNOLOGY_ANDA:8181
+
+====================================================================

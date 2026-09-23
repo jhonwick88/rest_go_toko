@@ -19,8 +19,11 @@ import (
 const licenseFile = "license.token"
 
 // activateURL can be overridden at build time using -ldflags "-X rest_go_toko/services.activateURL=http://172.16.0.137:8080/api/v1/license/activate"
-var activateURL = "http://localhost:8080/api/v1/license/activate"
-var trialURL = "http://localhost:8080/api/v1/license/trial"
+//var activateURL = "http://localhost:8080/api/v1/license/activate"
+//var trialURL = "http://localhost:8080/api/v1/license/trial"
+
+var activateURL = "http://203.88.125.140:8080/api/v1/license/activate"
+var trialURL = "http://203.88.125.140:8080/api/v1/license/trial"
 
 func init() {
 	log.Printf("License Service initialized. Activate URL: %s", activateURL)

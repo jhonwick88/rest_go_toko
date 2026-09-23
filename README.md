@@ -1,199 +1,94 @@
-# TokoPintar REST API (rest_go_toko)
+# 🏪 TokoPintar POS Server & Smart Business Engine
 
-Backend REST API berperforma tinggi dan berbobot ringan untuk ekosistem aplikasi kasir **TokoPintar (POS)**. Dibangun menggunakan bahasa **Go (Golang)** dengan framework **Gin** dan engine database **SQLite murni (Pure Go / CGO-Free)**.
+> **Solusi Kasir & Manajemen Toko Modern: Cepat, Akurat, Bebas Internet, dan Bebas Kebocoran Kas.**
 
-Proyek ini menyediakan layanan terpusat untuk katalog inventaris, transaksi penjualan (POS), pembukuan kas kasir, manajemen pengguna, audit log, serta proteksi lisensi enterprise berbasis perangkat keras (Hardware Fingerprint).
-
----
-
-## 🚀 Fitur Utama (Features)
-
-### 1. 🔐 Sistem Lisensi Enterprise & Anti-Tamper (Hardware-Bound Licensing)
-* **Hardware ID Fingerprinting**: Lisensi diikat secara permanen dengan identitas perangkat keras (`machineid.ProtectedID`) untuk mencegah duplikasi atau pembajakan aplikasi ke mesin lain.
-* **Offline Cryptographic Token Verification**: Memvalidasi token lisensi (`license.token`) bertanda tangan kriptografis secara instan dan aman bahkan tanpa koneksi internet.
-* **Aktivasi Otomatis & Trial License**: Mendukung aktivasi lisensi resmi maupun aktivasi masa percobaan (*14-day trial*) langsung via API (`/api/license/trial`) untuk produk `TP-POS`.
-* **Feature Tiering / Gate Middleware**: Membatasi akses endpoint secara granular berdasarkan paket lisensi aktif (misalnya fitur **PRO** seperti *Supplier Management* dan *Stock Ledger*).
-* **Global License Shield**: Middleware proteksi global yang otomatis mengunci akses operasional jika lisensi tidak sah, kadaluarsa, atau diubah secara ilegal.
+TokoPintar dirancang khusus untuk pemilik usaha ritel, grosir, minimarket, kafe, apotek, dan UMKM yang menginginkan sistem kasir yang **super cepat**, **anti-macet**, dan **memberikan kontrol penuh atas keuangan serta stok barang** tanpa ketergantungan pada internet.
 
 ---
 
-### 2. 📦 Manajemen Produk, Barcode, & Multi-Satuan
-* **Katalog & Kategori Produk**: Pengelolaan kategori (`ITEM_CATEGORY`) dan master produk (`ITEM`) secara lengkap (CRUD).
-* **Pencarian Cepat & Barcode Scanner**: Endpoint khusus pencarian teks instan (*case-insensitive*) dan lookup barcode untuk integrasi scanner kasir.
-* **Manajemen Multi-Satuan (Units)**: Fleksibilitas satuan penjualan (Pcs, Dus, Pack, Lusin, dll).
-* **Penyesuaian Stok Cepat (Stock Adjustment)**: Update stok langsung via endpoint `PATCH /api/items/:itemno/stock`.
-* **Item Cepat / Quick Access Items**: Konfigurasi produk favorit untuk mempercepat transaksi kasir di layar sentuh POS.
+## 💡 Mengapa Bisnis Anda Wajib Menggunakan TokoPintar?
+
+Banyak pemilik toko menghadapi masalah klasik:
+* ❌ **Uang kasir sering selisih** antara uang fisik di laci dan pencatatan kasir.
+* ❌ **Internet sering mati atau lemot**, membuat antrian pelanggan menumpuk dan transaksi terhenti.
+* ❌ **Stok barang sering bocor atau tidak cocok** tanpa tahu siapa yang mengubahnya.
+* ❌ **Biaya langganan bulanan mahal** dari aplikasi cloud yang mengunci data Anda.
+
+**TokoPintar menyelesaikan seluruh masalah tersebut dalam satu ekosistem terpadu!**
 
 ---
 
-### 3. 💳 Transaksi Penjualan & Kasir (POS Sales)
-* **Penerbitan Faktur & Penjualan**: Pencatatan transaksi penjualan secara atomik dengan kalkulasi subtotal, diskon, dan total tagihan.
-* **Pelacakan Status Faktur**: Pembaruan status pembayaran transaksi (lunas, pending, void).
-* **Riwayat Transaksi**: Pengambilan data riwayat transaksi penjualan dengan filter dan pagination efisien.
+## 🌟 Fitur & Keunggulan Utama
+
+### 1. ⚡ Transaksi Kasir Kilat & Anti Antre
+* **Pencarian Produk Seketika**: Ketik nama, kode SKU, atau gunakan scanner barcode — data produk langsung muncul dalam hitungan milidetik.
+* **Shortcut Produk Terlaris (Quick Add)**: Tombol pintas untuk produk yang paling sering dibeli, mempercepat proses checkout di jam-jam sibuk.
+* **Mendukung Berbagai Metode Pembayaran**: Tunai, QRIS, Transfer Bank, hingga E-Wallet dengan perhitungan kembalian dan diskon otomatis yang akurat.
+* **Fungsi Tahan Transaksi (Hold Bill)**: Pelanggan lupa dompet atau ingin menambah barang? Kasir bisa menahan transaksi sementara dan melayani antrian berikutnya tanpa kehilangan keranjang belanja sebelumnya.
 
 ---
 
-### 4. 💼 Rekonsiliasi Kas & Shift Kasir (Cash Reconciliation)
-* **Buka & Tutup Shift**: Pencatatan saldo kas awal kasir (*opening cash*).
-* **Hitung Kas Fisik & Selisih**: Perhitungan otomatis antara penerimaan sistem dengan uang fisik kasir di laci uang (*cash drawer*).
-* **Pelacakan Discrepancy**: Mendeteksi selisih lebih (*overage*) atau kurang (*shortage*) per shift.
+### 2. 🛡️ Anti Kebocoran Kas & Rekonsiliasi Otomatis (Cegah Fraud Kasir)
+* **Tutup Shift Kasir & Rekonsiliasi Kas Otomatis**: Setiap pergantian shift atau tutup toko, sistem menghitung otomatis total uang yang seharusnya ada di laci kasir vs uang fisik yang dihitung kasir. Selisih lebih atau kurang langsung terdeteksi seketika!
+* **Pencatatan Kas Keluar (Petty Cash Out)**: Kasir mengeluarkan uang untuk operasional toko (beli es batu, bayar galon, parkir, sampah)? Cukup catat di menu *Kas Keluar* dengan alasan jelas agar pembukuan kas tetap seimbang dan transparan.
+* **Otorisasi Void & Refund Ketat**: Pembatalan nota atau pengembalian barang wajib mencantumkan alasan yang terekam permanen. Kasir tidak bisa memanipulasi nota sembarangan.
 
 ---
 
-### 5. ⭐ Fitur Eksklusif PRO (Tiered Features)
-* **Supplier Management**: Kelola data pemasok barang dagangan (memerlukan fitur `supplier_management`).
-* **Buku Besar Pergerakan Stok (Stock Ledger)**: Lacak histori alur masuk dan keluar barang secara detail per nomor item (memerlukan fitur `stock_movement`).
+### 3. 📦 Manajemen Stok & Multi-Satuan Fleksibel
+* **Multi-Satuan Penjualan**: Jual barang dalam satuan eceran maupun grosir (Pcs, Pack, Lusin, Dus, Renteng) dalam satu sistem yang rapi.
+* **Penyesuaian Stok Cepat (Stock Opname)**: Perbarui stok fisik dengan scanner kamera atau input cepat tanpa harus menghentikan operasional toko.
+* **Kartu Pergerakan Stok (Stock Ledger)**: Pantau riwayat keluar-masuk setiap barang secara mendalam. Anda bisa melacak kapan barang masuk, terjual, disesuaikan, atau direfund.
+* **Manajemen Pemasok (Supplier Management)**: Catat data mitra supplier barang lengkap dengan kontak dan alamat untuk mempermudah pemesanan ulang barang.
 
 ---
 
-### 6. 🛡️ Keamanan, Audit Trail, & Pemeliharaan Sistem
-* **Manajemen Pengguna Kasir**: Kelola akun kasir dan hak akses.
-* **Audit Logging**: Jejak audit komprehensif untuk setiap aktivitas penting pada sistem.
-* **Profil Perusahaan / Toko**: Kelola data nama toko, alamat, telepon, dan pesan struk belanja.
-* **Backup & Restore Database**: Endpoint instan untuk mencadangkan dan memulihkan file database secara langsung.
+### 4. 🌐 Multi-Device Dalam Satu Jaringan (Bisa Banyak Kasir Sekaligus)
+* **Hubungkan Banyak Perangkat**: Gunakan beberapa komputer kasir, tablet, atau smartphone di toko Anda secara bersamaan.
+* **Sinkronisasi Data Otomatis**: Transaksi di kasir 1 langsung mengupdate stok yang tampil di kasir 2 dan dashboard toko secara seketika.
+* **Bebas Internet (100% Offline-Ready)**: Bekerja sempurna di jaringan Wi-Fi lokal toko. Toko Anda tetap bisa melayani pelanggan dengan lancar meskipun internet mati total!
 
 ---
 
-### 7. ⚡ Performa & Arsitektur Backend
-* **Pure Go SQLite (CGO-Free)**: Menggunakan driver modern `modernc.org/sqlite` tanpa ketergantungan DLL C atau kompilator CGO, sangat portabel untuk deployment Windows & Linux.
-* **SQLite WAL & Busy Timeout**: Konfigurasi `PRAGMA journal_mode=WAL` dan `PRAGMA busy_timeout=5000` untuk performa konkurensi baca/tulis tinggi tanpa deadlock.
-* **Koneksi Pooling Otomatis**: Manajemen *idle connection* dan *connection lifetime* terkelola optimal.
-* **Paginasi Server-Side (Limit & Offset)**: Paginasi data berkecepatan tinggi untuk dataset produk yang besar.
-* **CORS Middleware**: Siap dikonsumsi langsung oleh client multi-platform (Flutter Desktop TokoPintar, Mobile, atau Web).
-* **Graceful Shutdown**: Menangkap sinyal OS (`SIGINT`, `SIGTERM`) untuk menyelesaikan request berjalan sebelum server mati dengan aman.
-* **Format Respons JSON Terstandar**:
-  ```json
-  {
-    "success": true,
-    "message": "Operasi berhasil",
-    "data": [...]
-  }
-  ```
+### 5. 📊 Dashboard Analitik & Laporan Penjualan Siap Cetak
+* **Dashboard Omzet Real-Time**: Ketahui total omzet harian, laba kotor, jumlah transaksi, dan rata-rata belanja pelanggan (*average basket size*) dalam satu layar ringkas.
+* **Produk Terlaris (Top Selling Products)**: Cari tahu produk apa yang paling diminati untuk memaksimalkan strategi promosi dan stok barang Anda.
+* **Laporan Penjualan Lengkap per Kategori**: Analisis performa setiap kategori produk untuk mengetahui sektor mana yang menyumbang keuntungan terbesar.
+* **Ekspor Laporan ke Excel & CSV**: Satu klik untuk mengunduh laporan keuangan dan penjualan untuk kebutuhan pembukuan akuntansi atau perpajakan.
 
 ---
 
-## 📂 Struktur Proyek
-
-```text
-rest_go_toko/
-├── main.go               # Entrypoint aplikasi & konfigurasi Graceful Shutdown
-├── go.mod / go.sum       # Manajemen dependensi Golang
-├── .env                  # Variabel lingkungan runtime (konfigurasi lokal)
-├── .env.example          # Template konfigurasi environment
-├── config/
-│   └── config.go         # Loader konfigurasi sistem (godotenv)
-├── database/
-│   └── database.go       # Inisialisasi pool SQLite (WAL, Foreign Keys, Pool limits)
-├── middleware/
-│   ├── cors.go           # Penanganan CORS request
-│   └── license.go        # Middleware validasi lisensi & fitur (RequireLicense, RequireFeature)
-├── models/
-│   ├── category.go       # Model data kategori
-│   ├── item.go           # Model master barang & stok
-│   ├── sale.go           # Model transaksi penjualan & faktur
-│   ├── reconciliation.go # Model rekonsiliasi kas kasir
-│   └── response.go       # Struktur standar respons JSON & pagination
-├── handlers/
-│   ├── license_handler.go        # Handler aktivasi, trial, dan status lisensi
-│   ├── item_handler.go           # Handler master barang, barcode, pencarian, dan stok
-│   ├── category_handler.go       # Handler kategori barang
-│   ├── sale_handler.go           # Handler faktur dan transaksi POS
-│   ├── reconciliation_handler.go # Handler buka-tutup kas kasir
-│   ├── quick_item_handler.go     # Handler item favorit / shortcut POS
-│   ├── supplier_handler.go       # Handler supplier (PRO)
-│   ├── stock_ledger_handler.go   # Handler buku besar stok (PRO)
-│   ├── user_handler.go           # Handler pengguna & kasir
-│   ├── audit_handler.go          # Handler catatan audit sistem
-│   ├── company_handler.go        # Handler profil toko/perusahaan
-│   └── system_handler.go         # Handler backup & restore database
-├── routes/
-│   └── routes.go         # Pendaftaran seluruh rute API dan proteksi middleware
-└── services/
-    └── license_service.go # Core engine verifikasi token lisensi, fingerprint & validasi kriptografi
-```
+### 6. 🔒 Keamanan Bisnis Maksimal & Jejak Audit Lengkap
+* **Manajemen Akun Kasir & Hak Akses**: Atur akun untuk admin toko dan kasir dengan pembatasan hak akses yang aman.
+* **Audit Trail (Log Aktivitas)**: Setiap aktivitas penting (login, transaksi, void, perubahan harga, hapus data) dicatat secara otomatis lengkap dengan waktu dan nama pengguna yang melakukannya.
+* **Proteksi Lisensi Terkunci Perangkat**: Lisensi resmi terikat aman pada perangkat Anda, memastikan integritas sistem dan keamanan bisnis jangka panjang.
+* **Cadangkan & Pulihkan Data 1-Klik**: Lindungi data penting toko Anda dengan fitur backup dan restore data yang sangat mudah digunakan kapan saja.
 
 ---
 
-## 🛠️ Panduan Penggunaan & Setup
+## 💼 Cocok Untuk Berbagai Jenis Usaha
 
-### 1. Prasyarat
-* **Go 1.22+** terinstal di sistem
-* Database SQLite TokoPintar (`.db` atau `.sqlite`)
-
-### 2. Konfigurasi Environment (`.env`)
-Salin berkas `.env.example` menjadi `.env`:
-```env
-# Port server REST API
-SERVER_PORT=8181
-
-# Path file database SQLite lokal
-DB_PATH=H:\AMAN\tokopintar.db
-```
-
-### 3. Instalasi Dependensi
-```bash
-go mod tidy
-```
-
-### 4. Menjalankan Server
-```bash
-go run main.go
-```
-
-### 5. Kompilasi Binary (Produksi / Windows `.exe`)
-```bash
-go build -ldflags="-s -w" -o rest_go_toko.exe main.go
-```
-Jalankan file biner hasil kompilasi:
-```bash
-./rest_go_toko.exe
-```
+| Bidang Usaha | Manfaat Langsung |
+|---|---|
+| **Minimarket & Toko Kelontong** | Transaksi barcode kilat, stok ribuan SKU lancar, multi-satuan (renceng/dus/pcs). |
+| **Kafe & F&B / Resto Cepat Saji** | Tombol menu favorit, cetak struk pesanan cepat, rekonsiliasi kas harian per shift. |
+| **Apotek & Toko Obat** | Riwayat pergerakan stok rinci, pencatatan rapi, audit log keamanan transaksi. |
+| **Toko Pakaian & Fashion** | Manajemen varian dan barcode gantung, laporan produk paling laku. |
+| **Toko Bangunan & Perkakas** | Multi-satuan fleksibel, pencatatan kas keluar operasional harian yang transparan. |
 
 ---
 
-## 🌐 Ringkasan Endpoint API
+## 🏆 Keuntungan Investasi Sistem TokoPintar
 
-### Lisensi (Unprotected)
-| Method | Endpoint | Deskripsi |
-|---|---|---|
-| `POST` | `/api/license/activate` | Aktivasi lisensi menggunakan License Key |
-| `POST` | `/api/license/trial` | Permintaan aktivasi lisensi Trial (14 Hari) |
-| `GET`  | `/api/license/status` | Pengecekan status lisensi mesin saat ini |
+1. **Hemat Biaya Jangka Panjang**: Tanpa biaya langganan bulanan yang mencekik. Sekali pasang, sistem menjadi aset bisnis Anda selamanya.
+2. **Kemandirian Penuh**: Data penjualan adalah rahasia bisnis Anda. Data tersimpan aman di toko Anda sendiri, bukan di server pihak ketiga.
+3. **Keandalan Tinggi**: Toko tetap buka dan melayani ribuan transaksi tanpa pernah khawatir server cloud down atau kuota internet habis.
+4. **Kepuasan Pelanggan**: Layanan kasir yang gesit dan struk belanja yang profesional meningkatkan citra toko Anda di mata konsumen.
 
-### Master Data & Inventori (Protected)
-| Method | Endpoint | Deskripsi |
-|---|---|---|
-| `GET`    | `/api/categories` | Daftar semua kategori |
-| `POST`   | `/api/categories` | Tambah kategori baru |
-| `GET`    | `/api/items` | Ambil barang berpaginasi (`?page=1&limit=50`) |
-| `GET`    | `/api/items/search` | Cari barang (`?q=mie&page=1&limit=50`) |
-| `GET`    | `/api/items/barcode/:barcode` | Cari barang berdasarkan barcode |
-| `GET`    | `/api/items/:itemno` | Ambil detail satu barang |
-| `PATCH`  | `/api/items/:itemno/stock` | Penyesuaian jumlah stok barang |
-| `GET`    | `/api/units` | Daftar satuan barang |
-| `GET`    | `/api/quick-items` | Daftar item cepat / shortcut kasir |
+---
 
-### Transaksi & Kasir (Protected)
-| Method | Endpoint | Deskripsi |
-|---|---|---|
-| `GET`   | `/api/sales` | Riwayat transaksi penjualan |
-| `POST`  | `/api/sales` | Simpan transaksi penjualan baru |
-| `PATCH` | `/api/sales/:invoiceno/status` | Update status faktur |
-| `GET`   | `/api/cash-reconciliations` | Riwayat buka/tutup kasir |
-| `POST`  | `/api/cash-reconciliations` | Simpan rekonsiliasi kas kasir |
+## 🚀 Siap Mengembangkan Bisnis Anda?
 
-### Fitur Eksklusif PRO (Protected by Feature Tier)
-| Method | Endpoint | Fitur yang Diperlukan | Deskripsi |
-|---|---|---|---|
-| `GET`  | `/api/suppliers` | `supplier_management` | Ambil data daftar supplier |
-| `POST` | `/api/suppliers` | `supplier_management` | Tambah supplier baru |
-| `GET`  | `/api/stock-ledger/:itemno` | `stock_movement` | Kartu riwayat pergerakan stok barang |
+Tinggalkan cara manual dan beralihlah ke sistem modern yang melindungi keuntungan toko Anda. 
 
-### Sistem & Pengaturan (Protected)
-| Method | Endpoint | Deskripsi |
-|---|---|---|
-| `GET`  | `/api/company` | Ambil profil identitas toko |
-| `PUT`  | `/api/company` | Update profil toko |
-| `GET`  | `/api/audit-logs` | Ambil riwayat audit log |
-| `GET`  | `/api/backup` | Download cadangan database |
-| `POST` | `/api/restore` | Pulihkan database dari backup |
+**Hubungi kami sekarang untuk demo dan aktivasi lisensi toko Anda!**
