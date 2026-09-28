@@ -30,13 +30,20 @@ func ActivateLicense(c *gin.Context) {
 
 	claims, _ := services.GetLicenseClaims()
 	var features map[string]interface{}
+	var licenseID, customerID, planID string
 	if claims != nil {
 		features = claims.Features
+		licenseID = claims.LicenseID
+		customerID = claims.CustomerID
+		planID = claims.PlanID
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "License activated successfully",
-		"features": features,
+		"message":     "License activated successfully",
+		"features":    features,
+		"license_id":  licenseID,
+		"customer_id": customerID,
+		"plan_id":     planID,
 	})
 }
 
@@ -53,13 +60,20 @@ func RequestTrialLicense(c *gin.Context) {
 
 	claims, _ := services.GetLicenseClaims()
 	var features map[string]interface{}
+	var licenseID, customerID, planID string
 	if claims != nil {
 		features = claims.Features
+		licenseID = claims.LicenseID
+		customerID = claims.CustomerID
+		planID = claims.PlanID
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Trial license activated successfully",
-		"features": features,
+		"message":     "Trial license activated successfully",
+		"features":    features,
+		"license_id":  licenseID,
+		"customer_id": customerID,
+		"plan_id":     planID,
 	})
 }
 
@@ -87,5 +101,6 @@ func GetLicenseStatus(c *gin.Context) {
 		"features":     claims.Features,
 		"license_id":   claims.LicenseID,
 		"customer_id":  claims.CustomerID,
+		"plan_id":      claims.PlanID,
 	})
 }

@@ -14,6 +14,7 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 	r := gin.New()
 
 	r.Use(gin.Logger())
+	r.Use(middleware.ErrorLoggerMiddleware())
 	r.Use(gin.Recovery())
 	r.Use(middleware.CORSMiddleware())
 

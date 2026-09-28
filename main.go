@@ -12,19 +12,28 @@ import (
 
 	"rest_go_toko/config"
 	"rest_go_toko/database"
+	"rest_go_toko/middleware"
 	"rest_go_toko/routes"
 )
 
 func main() {
 	log.Println("Starting REST API Toko Pintar...")
 
-	// 1. Load configurations from .env/environment
+	// 1. Initialize Error Logger for error.log file
+	logFile, err := middleware.InitErrorLogger("error.log")
+	if err != nil {
+		log.Printf("[Warning] Could not initialize error.log: %v", err)
+	} else {
+		defer logFile.Close()
+	}
+
+	// 2. Load configurations from .env/environment
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Critical Configuration Error: %v", err)
 	}
 
-	// 2. Initialize Firebird connection pool
+	// 3. Initialize Database connection pool
 	db, err := database.InitDB(cfg)
 	if err != nil {
 		log.Fatalf("Critical Database Connection Error: %v", err)
