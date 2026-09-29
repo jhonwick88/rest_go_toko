@@ -10,9 +10,10 @@ import (
 
 	"rest_go_toko/models"
 
+	"rest_go_toko/services"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"rest_go_toko/services"
 )
 
 // GetSales returns all sales headers
@@ -47,7 +48,7 @@ func GetSales(db *sql.DB) gin.HandlerFunc {
 
 		query = fmt.Sprintf("SELECT ID, INVOICE_NO, DATE, CASHIER, SUBTOTAL, DISCOUNT, GRAND_TOTAL, TAX, PAYMENT_METHOD, PAID_AMOUNT, CHANGE_AMOUNT, STATUS, VOID_REASON, VOIDED_AT, VOIDED_BY, REFUND_REASON, REFUNDED_AT, REFUNDED_BY, CUSTOMER_ID, IS_VOID FROM SALES %sORDER BY DATE DESC LIMIT ? OFFSET ?", whereClause)
 		args = append(args, limit, offset)
-		
+
 		rows, err := db.Query(query, args...)
 		if err != nil {
 			log.Printf("[Error] Query GetSales failed: %v", err)
@@ -68,7 +69,7 @@ func GetSales(db *sql.DB) gin.HandlerFunc {
 				SendError(c, http.StatusInternalServerError, "Gagal membaca data penjualan")
 				return
 			}
-			
+
 			s.SaleDate = saleDate.String
 			s.CashierID = cashierID.String
 			s.PaymentMethod = paymentMethod.String
@@ -80,7 +81,7 @@ func GetSales(db *sql.DB) gin.HandlerFunc {
 			s.RefundedAt = refundedAt.String
 			s.RefundedBy = refundedBy.String
 			s.Items = []models.SalesItem{}
-			
+
 			if customerID.Valid {
 				cid := int(customerID.Int64)
 				s.CustomerID = &cid
@@ -101,11 +102,11 @@ func GetSales(db *sql.DB) gin.HandlerFunc {
 
 			itemsQuery := fmt.Sprintf(`SELECT 
 				si.ID, si.INVOICE_NO, si.ITEMNO, si.ITEMNAME, si.ITEMUPC, si.QTY, si.PRICE, si.DISCOUNT, si.SUBTOTAL, si.NOTE,
-				COALESCE(si.CATEGORY_ID, i.CATEGORY_ID, 0) AS CATEGORY_ID,
-				COALESCE(NULLIF(si.CATEGORY_NAME, ''), c.NAME, 'Tanpa Kategori') AS CATEGORY_NAME
+				COALESCE(i.CATEGORYID, si.CATEGORY_ID, 0) AS CATEGORY_ID,
+				COALESCE(c.NAME, NULLIF(si.CATEGORY_NAME, ''), 'Tanpa Kategori') AS CATEGORY_NAME
 			FROM SALES_ITEMS si
 			LEFT JOIN ITEM i ON (LOWER(si.ITEMNO) = LOWER(i.ITEMNO) OR (si.ITEMUPC != '' AND LOWER(si.ITEMUPC) = LOWER(i.ITEMUPC)))
-			LEFT JOIN CATEGORY c ON (COALESCE(si.CATEGORY_ID, i.CATEGORY_ID, 0) = c.ID)
+			LEFT JOIN ITEM_CATEGORY c ON i.CATEGORYID = c.ID
 			WHERE si.INVOICE_NO IN (%s)
 			ORDER BY si.ID ASC`, strings.Join(placeholders, ","))
 
@@ -159,7 +160,7 @@ func CreateSale(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req models.CreateSalesRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			SendError(c, http.StatusBadRequest, "Payload request tidak valid: " + err.Error())
+			SendError(c, http.StatusBadRequest, "Payload request tidak valid: "+err.Error())
 			return
 		}
 
@@ -225,18 +226,18 @@ func CreateSale(db *sql.DB) gin.HandlerFunc {
 		itemQuery := "INSERT INTO SALES_ITEMS (ID, INVOICE_NO, ITEMNO, ITEMNAME, ITEMUPC, QTY, PRICE, DISCOUNT, SUBTOTAL, NOTE, TAX, CATEGORY_ID, CATEGORY_NAME) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 		updateStockQuery := "UPDATE ITEM SET OBQUANTITY = OBQUANTITY - ? WHERE ITEMNO = ?"
 		stockLedgerQuery := "INSERT INTO STOCK_LEDGER (ITEMNO, TX_TYPE, QTY, NOTES, REFERENCE_ID, TIMESTAMP) VALUES (?, 'OUT', ?, 'Sale', ?, ?)"
-		
+
 		for i, item := range req.Items {
 			maxID++
-			
+
 			noteToSave := item.Note
 			if item.UnitName != "" {
 				if noteToSave != "" {
 					noteToSave += " | "
 				}
-				noteToSave += "Satuan: " + item.UnitName
+				noteToSave += item.UnitName
 			}
-			
+
 			// Only allow saving Tax if advanced_pos is enabled
 			itemTax := 0.0
 			if hasAdvancedPos {
@@ -246,22 +247,22 @@ func CreateSale(db *sql.DB) gin.HandlerFunc {
 			catID := item.CategoryID
 			catName := item.CategoryName
 
-			// Fallback resolution from master ITEM and CATEGORY if not provided
-			if catID == 0 || catName == "" {
+			// Fallback resolution from master ITEM and CATEGORY if not provided or empty
+			if catID == 0 || catName == "" || catName == "Tanpa Kategori" {
 				var dbCatID sql.NullInt64
 				var dbCatName sql.NullString
 				_ = tx.QueryRow(`
-					SELECT COALESCE(i.CATEGORY_ID, 0), COALESCE(c.NAME, 'Tanpa Kategori')
+					SELECT COALESCE(i.CATEGORYID, 0), COALESCE(c.NAME, 'Tanpa Kategori')
 					FROM ITEM i
-					LEFT JOIN CATEGORY c ON i.CATEGORY_ID = c.ID
-					WHERE LOWER(i.ITEMNO) = LOWER(?) OR (i.ITEMUPC != '' AND LOWER(i.ITEMUPC) = LOWER(?))
+					LEFT JOIN ITEM_CATEGORY c ON i.CATEGORYID = c.ID
+					WHERE LOWER(i.ITEMNO) = LOWER(?) OR (i.ITEMUPC != '' AND LOWER(i.ITEMUPC) = LOWER(?)) OR LOWER(i.ITEMNAME) = LOWER(?)
 					LIMIT 1
-				`, item.ItemNo, item.ItemUPC).Scan(&dbCatID, &dbCatName)
+				`, item.ItemNo, item.ItemUPC, item.ItemName).Scan(&dbCatID, &dbCatName)
 
 				if catID == 0 && dbCatID.Valid {
 					catID = int(dbCatID.Int64)
 				}
-				if catName == "" && dbCatName.Valid {
+				if (catName == "" || catName == "Tanpa Kategori") && dbCatName.Valid && dbCatName.String != "" {
 					catName = dbCatName.String
 				}
 			}
@@ -282,7 +283,7 @@ func CreateSale(db *sql.DB) gin.HandlerFunc {
 			if item.Ratio > 0 {
 				qtyToDeduct = item.Qty * item.Ratio
 			}
-			
+
 			_, err = tx.Exec(updateStockQuery, qtyToDeduct, item.ItemNo)
 			if err != nil {
 				tx.Rollback()
@@ -353,10 +354,10 @@ func UpdateSaleStatus(db *sql.DB) gin.HandlerFunc {
 		}
 
 		now := time.Now().Format(time.RFC3339)
-		
+
 		var query string
 		var args []interface{}
-		
+
 		if input.Status == "voided" {
 			query = "UPDATE SALES SET STATUS = ?, IS_VOID = 1, VOID_REASON = ?, VOIDED_AT = ?, VOIDED_BY = ? WHERE INVOICE_NO = ?"
 			args = []interface{}{input.Status, input.Reason, now, input.User, invoiceNo}
