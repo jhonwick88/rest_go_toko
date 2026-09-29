@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"rest_go_toko/models"
@@ -19,17 +21,32 @@ func GetSales(db *sql.DB) gin.HandlerFunc {
 		limit, offset := GetPaginationParams(c)
 		startDate := c.Query("start_date")
 		endDate := c.Query("end_date")
+		searchQuery := strings.TrimSpace(c.Query("q"))
+		if searchQuery == "" {
+			searchQuery = strings.TrimSpace(c.Query("search"))
+		}
 
 		var query string
 		var args []interface{}
-		
+
+		var conditions []string
 		if startDate != "" && endDate != "" {
-			query = "SELECT ID, INVOICE_NO, DATE, CASHIER, SUBTOTAL, DISCOUNT, GRAND_TOTAL, TAX, PAYMENT_METHOD, PAID_AMOUNT, CHANGE_AMOUNT, STATUS, VOID_REASON, VOIDED_AT, VOIDED_BY, REFUND_REASON, REFUNDED_AT, REFUNDED_BY, CUSTOMER_ID, IS_VOID FROM SALES WHERE DATE >= ? AND DATE <= ? ORDER BY DATE DESC LIMIT ? OFFSET ?"
-			args = []interface{}{startDate, endDate, limit, offset}
-		} else {
-			query = "SELECT ID, INVOICE_NO, DATE, CASHIER, SUBTOTAL, DISCOUNT, GRAND_TOTAL, TAX, PAYMENT_METHOD, PAID_AMOUNT, CHANGE_AMOUNT, STATUS, VOID_REASON, VOIDED_AT, VOIDED_BY, REFUND_REASON, REFUNDED_AT, REFUNDED_BY, CUSTOMER_ID, IS_VOID FROM SALES ORDER BY DATE DESC LIMIT ? OFFSET ?"
-			args = []interface{}{limit, offset}
+			conditions = append(conditions, "DATE >= ? AND DATE <= ?")
+			args = append(args, startDate, endDate)
 		}
+		if searchQuery != "" {
+			conditions = append(conditions, "(INVOICE_NO LIKE ? OR CASHIER LIKE ? OR INVOICE_NO IN (SELECT DISTINCT INVOICE_NO FROM SALES_ITEMS WHERE ITEMNAME LIKE ? OR ITEMNO LIKE ? OR ITEMUPC LIKE ?))")
+			wildcard := "%" + searchQuery + "%"
+			args = append(args, wildcard, wildcard, wildcard, wildcard, wildcard)
+		}
+
+		whereClause := ""
+		if len(conditions) > 0 {
+			whereClause = "WHERE " + strings.Join(conditions, " AND ") + " "
+		}
+
+		query = fmt.Sprintf("SELECT ID, INVOICE_NO, DATE, CASHIER, SUBTOTAL, DISCOUNT, GRAND_TOTAL, TAX, PAYMENT_METHOD, PAID_AMOUNT, CHANGE_AMOUNT, STATUS, VOID_REASON, VOIDED_AT, VOIDED_BY, REFUND_REASON, REFUNDED_AT, REFUNDED_BY, CUSTOMER_ID, IS_VOID FROM SALES %sORDER BY DATE DESC LIMIT ? OFFSET ?", whereClause)
+		args = append(args, limit, offset)
 		
 		rows, err := db.Query(query, args...)
 		if err != nil {
@@ -40,6 +57,7 @@ func GetSales(db *sql.DB) gin.HandlerFunc {
 		defer rows.Close()
 
 		var sales []models.Sales
+		var invoiceNos []string
 		for rows.Next() {
 			var s models.Sales
 			var customerID sql.NullInt64
@@ -61,26 +79,50 @@ func GetSales(db *sql.DB) gin.HandlerFunc {
 			s.RefundReason = refundReason.String
 			s.RefundedAt = refundedAt.String
 			s.RefundedBy = refundedBy.String
+			s.Items = []models.SalesItem{}
 			
 			if customerID.Valid {
 				cid := int(customerID.Int64)
 				s.CustomerID = &cid
 			}
 
-			// Fetch items for this sale
-			itemsQuery := "SELECT ID, INVOICE_NO, ITEMNO, ITEMNAME, ITEMUPC, QTY, PRICE, DISCOUNT, SUBTOTAL, NOTE FROM SALES_ITEMS WHERE INVOICE_NO = ?"
-			itemRows, err := db.Query(itemsQuery, s.ReceiptNo)
+			invoiceNos = append(invoiceNos, s.ReceiptNo)
+			sales = append(sales, s)
+		}
+
+		// Batch fetch items for all invoices in a single query (resolving N+1 query problem)
+		if len(invoiceNos) > 0 {
+			placeholders := make([]string, len(invoiceNos))
+			itemArgs := make([]interface{}, len(invoiceNos))
+			for i, inv := range invoiceNos {
+				placeholders[i] = "?"
+				itemArgs[i] = inv
+			}
+
+			itemsQuery := fmt.Sprintf(`SELECT 
+				si.ID, si.INVOICE_NO, si.ITEMNO, si.ITEMNAME, si.ITEMUPC, si.QTY, si.PRICE, si.DISCOUNT, si.SUBTOTAL, si.NOTE,
+				COALESCE(si.CATEGORY_ID, i.CATEGORY_ID, 0) AS CATEGORY_ID,
+				COALESCE(NULLIF(si.CATEGORY_NAME, ''), c.NAME, 'Tanpa Kategori') AS CATEGORY_NAME
+			FROM SALES_ITEMS si
+			LEFT JOIN ITEM i ON (LOWER(si.ITEMNO) = LOWER(i.ITEMNO) OR (si.ITEMUPC != '' AND LOWER(si.ITEMUPC) = LOWER(i.ITEMUPC)))
+			LEFT JOIN CATEGORY c ON (COALESCE(si.CATEGORY_ID, i.CATEGORY_ID, 0) = c.ID)
+			WHERE si.INVOICE_NO IN (%s)
+			ORDER BY si.ID ASC`, strings.Join(placeholders, ","))
+
+			itemRows, err := db.Query(itemsQuery, itemArgs...)
 			if err != nil {
-				log.Printf("[Error] Query GetSales items failed: %v", err)
+				log.Printf("[Error] Query batch GetSales items failed: %v", err)
 			} else {
-				var items []models.SalesItem
+				defer itemRows.Close()
+				itemsByInvoice := make(map[string][]models.SalesItem)
 				for itemRows.Next() {
 					var it models.SalesItem
 					var id sql.NullInt64
-					var saleId, itemNo, itemName, itemUpc, note sql.NullString
+					var saleId, itemNo, itemName, itemUpc, note, catName sql.NullString
 					var qty, price, discount, subtotal sql.NullFloat64
+					var catId sql.NullInt64
 
-					if err := itemRows.Scan(&id, &saleId, &itemNo, &itemName, &itemUpc, &qty, &price, &discount, &subtotal, &note); err == nil {
+					if err := itemRows.Scan(&id, &saleId, &itemNo, &itemName, &itemUpc, &qty, &price, &discount, &subtotal, &note, &catId, &catName); err == nil {
 						it.ID = int(id.Int64)
 						it.SaleID = saleId.String
 						it.ItemNo = itemNo.String
@@ -91,17 +133,18 @@ func GetSales(db *sql.DB) gin.HandlerFunc {
 						it.Discount = discount.Float64
 						it.Total = subtotal.Float64
 						it.Note = note.String
-						items = append(items, it)
+						it.CategoryID = int(catId.Int64)
+						it.CategoryName = catName.String
+						itemsByInvoice[it.SaleID] = append(itemsByInvoice[it.SaleID], it)
 					}
 				}
-				itemRows.Close()
-				s.Items = items
-			}
-			if s.Items == nil {
-				s.Items = []models.SalesItem{}
-			}
 
-			sales = append(sales, s)
+				for i := range sales {
+					if its, ok := itemsByInvoice[sales[i].ReceiptNo]; ok {
+						sales[i].Items = its
+					}
+				}
+			}
 		}
 
 		if sales == nil {
@@ -179,7 +222,7 @@ func CreateSale(db *sql.DB) gin.HandlerFunc {
 		var maxID int
 		_ = tx.QueryRow("SELECT COALESCE(MAX(ID), 0) FROM SALES_ITEMS").Scan(&maxID)
 
-		itemQuery := "INSERT INTO SALES_ITEMS (ID, INVOICE_NO, ITEMNO, ITEMNAME, ITEMUPC, QTY, PRICE, DISCOUNT, SUBTOTAL, NOTE, TAX) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+		itemQuery := "INSERT INTO SALES_ITEMS (ID, INVOICE_NO, ITEMNO, ITEMNAME, ITEMUPC, QTY, PRICE, DISCOUNT, SUBTOTAL, NOTE, TAX, CATEGORY_ID, CATEGORY_NAME) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 		updateStockQuery := "UPDATE ITEM SET OBQUANTITY = OBQUANTITY - ? WHERE ITEMNO = ?"
 		stockLedgerQuery := "INSERT INTO STOCK_LEDGER (ITEMNO, TX_TYPE, QTY, NOTES, REFERENCE_ID, TIMESTAMP) VALUES (?, 'OUT', ?, 'Sale', ?, ?)"
 		
@@ -200,7 +243,33 @@ func CreateSale(db *sql.DB) gin.HandlerFunc {
 				itemTax = item.Tax
 			}
 
-			_, err = tx.Exec(itemQuery, maxID, req.ReceiptNo, item.ItemNo, item.ItemName, item.ItemUPC, item.Qty, item.Price, item.Discount, item.Total, noteToSave, itemTax)
+			catID := item.CategoryID
+			catName := item.CategoryName
+
+			// Fallback resolution from master ITEM and CATEGORY if not provided
+			if catID == 0 || catName == "" {
+				var dbCatID sql.NullInt64
+				var dbCatName sql.NullString
+				_ = tx.QueryRow(`
+					SELECT COALESCE(i.CATEGORY_ID, 0), COALESCE(c.NAME, 'Tanpa Kategori')
+					FROM ITEM i
+					LEFT JOIN CATEGORY c ON i.CATEGORY_ID = c.ID
+					WHERE LOWER(i.ITEMNO) = LOWER(?) OR (i.ITEMUPC != '' AND LOWER(i.ITEMUPC) = LOWER(?))
+					LIMIT 1
+				`, item.ItemNo, item.ItemUPC).Scan(&dbCatID, &dbCatName)
+
+				if catID == 0 && dbCatID.Valid {
+					catID = int(dbCatID.Int64)
+				}
+				if catName == "" && dbCatName.Valid {
+					catName = dbCatName.String
+				}
+			}
+			if catName == "" {
+				catName = "Tanpa Kategori"
+			}
+
+			_, err = tx.Exec(itemQuery, maxID, req.ReceiptNo, item.ItemNo, item.ItemName, item.ItemUPC, item.Qty, item.Price, item.Discount, item.Total, noteToSave, itemTax, catID, catName)
 			if err != nil {
 				tx.Rollback()
 				log.Printf("[Error] Insert Sales Item failed: %v", err)

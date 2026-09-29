@@ -59,6 +59,28 @@ func InitDB(cfg *config.Config) (*sql.DB, error) {
 		log.Printf("[Warning] Failed to run table migrations: %v", err)
 	}
 
+	// Migrate SALES_ITEMS to have CATEGORY_ID and CATEGORY_NAME
+	_, _ = db.Exec("ALTER TABLE SALES_ITEMS ADD COLUMN CATEGORY_ID INTEGER DEFAULT 0")
+	_, _ = db.Exec("ALTER TABLE SALES_ITEMS ADD COLUMN CATEGORY_NAME TEXT DEFAULT ''")
+
+	// Create Indexes for High Performance Queries
+	indexQueries := `
+	CREATE INDEX IF NOT EXISTS idx_sales_date ON SALES(DATE);
+	CREATE INDEX IF NOT EXISTS idx_sales_invoice_no ON SALES(INVOICE_NO);
+	CREATE INDEX IF NOT EXISTS idx_sales_status ON SALES(STATUS);
+	CREATE INDEX IF NOT EXISTS idx_sales_items_invoice ON SALES_ITEMS(INVOICE_NO);
+	CREATE INDEX IF NOT EXISTS idx_sales_items_itemno ON SALES_ITEMS(ITEMNO);
+	CREATE INDEX IF NOT EXISTS idx_item_itemno ON ITEM(ITEMNO);
+	CREATE INDEX IF NOT EXISTS idx_item_itemupc ON ITEM(ITEMUPC);
+	CREATE INDEX IF NOT EXISTS idx_item_categoryid ON ITEM(CATEGORYID);
+	CREATE INDEX IF NOT EXISTS idx_stock_ledger_itemno ON STOCK_LEDGER(ITEMNO);
+	CREATE INDEX IF NOT EXISTS idx_cash_movements_date ON CASH_MOVEMENTS(DATE);
+	CREATE INDEX IF NOT EXISTS idx_cash_reconciliations_date ON CASH_RECONCILIATIONS(DATE);
+	`
+	if _, err := db.Exec(indexQueries); err != nil {
+		log.Printf("[Warning] Failed to create database indexes: %v", err)
+	}
+
 	log.Println("SQLite database connection established successfully")
 	return db, nil
 }

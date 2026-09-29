@@ -38,8 +38,10 @@ type SalesItem struct {
 	Price    float64 `json:"price"`
 	Discount float64 `json:"discount"`
 	Tax      float64 `json:"tax"`
-	Total    float64 `json:"total"`
-	Note     string  `json:"note"`
+	Total        float64 `json:"total"`
+	Note         string  `json:"note"`
+	CategoryID   int     `json:"category_id"`
+	CategoryName string  `json:"category_name,omitempty"`
 	
 	// Temporary fields from frontend request (not saved directly to DB columns, but used for logic)
 	UnitName string  `json:"unit_name,omitempty"`
