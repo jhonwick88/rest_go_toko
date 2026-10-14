@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -49,8 +50,8 @@ func RestoreDatabase(db *sql.DB) gin.HandlerFunc {
 		}
 		defer file.Close()
 
-		// Validate file extension loosely
-		if len(header.Filename) < 3 || header.Filename[len(header.Filename)-3:] != ".db" {
+		// Validate file extension case-insensitively
+		if !strings.HasSuffix(strings.ToLower(header.Filename), ".db") {
 			SendError(c, http.StatusBadRequest, "Format file harus .db")
 			return
 		}

@@ -13,7 +13,10 @@ import (
 // GetQuickItems returns all quick items
 func GetQuickItems(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		query := "SELECT ID, ITEM_NO, ITEM_NAME, ICON_NAME, COLOR_HEX, DISPLAY_ORDER, IS_ACTIVE FROM QUICK_ITEMS ORDER BY DISPLAY_ORDER ASC"
+		query := `SELECT q.ID, q.ITEM_NO, q.ITEM_NAME, q.ICON_NAME, q.COLOR_HEX, q.DISPLAY_ORDER, q.IS_ACTIVE, COALESCE(i.DEF_UNITPRICE1, 0)
+			FROM QUICK_ITEMS q
+			LEFT JOIN ITEM i ON q.ITEM_NO = i.ITEMNO
+			ORDER BY q.DISPLAY_ORDER ASC`
 		rows, err := db.Query(query)
 		if err != nil {
 			log.Printf("[Error] Query GetQuickItems failed: %v", err)
@@ -26,12 +29,14 @@ func GetQuickItems(db *sql.DB) gin.HandlerFunc {
 		for rows.Next() {
 			var q models.QuickItem
 			var icon, color sql.NullString
-			if err := rows.Scan(&q.ID, &q.ItemNo, &q.ItemName, &icon, &color, &q.DisplayOrder, &q.IsActive); err != nil {
+			var price sql.NullFloat64
+			if err := rows.Scan(&q.ID, &q.ItemNo, &q.ItemName, &icon, &color, &q.DisplayOrder, &q.IsActive, &price); err != nil {
 				SendError(c, http.StatusInternalServerError, "Gagal membaca data quick items")
 				return
 			}
 			q.IconName = icon.String
 			q.ColorHex = color.String
+			q.Price = price.Float64
 			items = append(items, q)
 		}
 
