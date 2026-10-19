@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -67,9 +68,19 @@ func GetCategoryItems(db *sql.DB) gin.HandlerFunc {
 		}
 
 		limit, offset := GetPaginationParams(c)
+		barcodeStatus := c.Query("barcode_status")
 
-		query := "SELECT ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM WHERE CATEGORYID = ? ORDER BY ITEMNAME ASC LIMIT ? OFFSET ?"
-		rows, err := db.Query(query, categoryID, limit, offset)
+		whereClause := "WHERE CATEGORYID = ?"
+		args := []interface{}{categoryID}
+		if barcodeStatus == "has_barcode" {
+			whereClause += " AND ITEMUPC IS NOT NULL AND TRIM(ITEMUPC) != ''"
+		} else if barcodeStatus == "no_barcode" {
+			whereClause += " AND (ITEMUPC IS NULL OR TRIM(ITEMUPC) = '')"
+		}
+
+		query := fmt.Sprintf("SELECT ITEMNO, ITEMUPC, ITEMNAME, CATEGORYID, DEF_UNITPRICE1, OBQUANTITY FROM ITEM %s ORDER BY ITEMNAME ASC LIMIT ? OFFSET ?", whereClause)
+		args = append(args, limit, offset)
+		rows, err := db.Query(query, args...)
 		if err != nil {
 			log.Printf("[Error] Query GetCategoryItems failed: %v", err)
 			SendError(c, http.StatusInternalServerError, "Gagal mengakses database untuk mengambil produk: "+err.Error())

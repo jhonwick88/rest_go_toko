@@ -37,12 +37,14 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 		// Item routes
 		api.GET("/items", handlers.GetItems(db))
 		api.GET("/items/search", handlers.SearchItems(db))
+		api.GET("/items/barcode-stats", handlers.GetBarcodeStats(db))
+		api.GET("/items/barcode/:barcode", handlers.GetItemsByBarcode(db))
 		api.GET("/items/:itemno", handlers.GetItemByNo(db))
 		api.PUT("/items/:itemno", handlers.UpdateItem(db))
+		api.PATCH("/items/:itemno/barcode", handlers.UpdateItemBarcode(db))
+		api.PATCH("/items/:itemno/stock", handlers.UpdateStock(db))
 		api.POST("/items", handlers.CreateItem(db))
 		api.DELETE("/items/:itemno", handlers.DeleteItem(db))
-		api.PATCH("/items/:itemno/stock", handlers.UpdateStock(db))
-		api.GET("/items/barcode/:barcode", handlers.GetItemsByBarcode(db))
 
 		// User routes
 		api.GET("/users", handlers.GetUsers(db))

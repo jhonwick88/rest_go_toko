@@ -23,11 +23,12 @@ func GetCompany(db *sql.DB) gin.HandlerFunc {
 			COALESCE(ENABLE_TAX, 0), 
 			COALESCE(TAX_PERCENTAGE, 0.0), 
 			COALESCE(ENABLE_SERVICE_CHARGE, 0), 
-			COALESCE(SERVICE_CHARGE_PERCENTAGE, 0.0) 
+			COALESCE(SERVICE_CHARGE_PERCENTAGE, 0.0),
+			COALESCE(ALLOW_CASHIER_STOCK_OPNAME, 0)
 		FROM COMPANY LIMIT 1`
 
 		var company models.Company
-		var enableTaxInt, enableServiceInt int
+		var enableTaxInt, enableServiceInt, allowStockInt int
 		err := db.QueryRow(query).Scan(
 			&company.CompanyName,
 			&company.AddressLine1,
@@ -39,9 +40,11 @@ func GetCompany(db *sql.DB) gin.HandlerFunc {
 			&company.TaxPercentage,
 			&enableServiceInt,
 			&company.ServiceChargePercentage,
+			&allowStockInt,
 		)
 		company.EnableTax = enableTaxInt == 1
 		company.EnableServiceCharge = enableServiceInt == 1
+		company.AllowCashierStockOpname = allowStockInt == 1
 
 		if err != nil {
 			if err == sql.ErrNoRows {
@@ -89,14 +92,18 @@ func UpdateCompany(db *sql.DB) gin.HandlerFunc {
 		if input.EnableServiceCharge {
 			enableServiceInt = 1
 		}
+		allowStockInt := 0
+		if input.AllowCashierStockOpname {
+			allowStockInt = 1
+		}
 
 		if count == 0 {
 			// Insert
 			query := `INSERT INTO COMPANY 
-			(COMPANYNAME, ADDRESSLINE1, PHONENO, RECEIPT_HEADER, RECEIPT_FOOTER, ADMIN_PIN, ENABLE_TAX, TAX_PERCENTAGE, ENABLE_SERVICE_CHARGE, SERVICE_CHARGE_PERCENTAGE) 
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			(COMPANYNAME, ADDRESSLINE1, PHONENO, RECEIPT_HEADER, RECEIPT_FOOTER, ADMIN_PIN, ENABLE_TAX, TAX_PERCENTAGE, ENABLE_SERVICE_CHARGE, SERVICE_CHARGE_PERCENTAGE, ALLOW_CASHIER_STOCK_OPNAME) 
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 			
-			_, err = db.Exec(query, input.CompanyName, input.AddressLine1, input.PhoneNo, input.ReceiptHeader, input.ReceiptFooter, input.AdminPin, enableTaxInt, input.TaxPercentage, enableServiceInt, input.ServiceChargePercentage)
+			_, err = db.Exec(query, input.CompanyName, input.AddressLine1, input.PhoneNo, input.ReceiptHeader, input.ReceiptFooter, input.AdminPin, enableTaxInt, input.TaxPercentage, enableServiceInt, input.ServiceChargePercentage, allowStockInt)
 		} else {
 			// Update
 			query := `UPDATE COMPANY SET 
@@ -109,9 +116,10 @@ func UpdateCompany(db *sql.DB) gin.HandlerFunc {
 			ENABLE_TAX = ?, 
 			TAX_PERCENTAGE = ?, 
 			ENABLE_SERVICE_CHARGE = ?, 
-			SERVICE_CHARGE_PERCENTAGE = ?`
+			SERVICE_CHARGE_PERCENTAGE = ?,
+			ALLOW_CASHIER_STOCK_OPNAME = ?`
 			
-			_, err = db.Exec(query, input.CompanyName, input.AddressLine1, input.PhoneNo, input.ReceiptHeader, input.ReceiptFooter, input.AdminPin, enableTaxInt, input.TaxPercentage, enableServiceInt, input.ServiceChargePercentage)
+			_, err = db.Exec(query, input.CompanyName, input.AddressLine1, input.PhoneNo, input.ReceiptHeader, input.ReceiptFooter, input.AdminPin, enableTaxInt, input.TaxPercentage, enableServiceInt, input.ServiceChargePercentage, allowStockInt)
 		}
 
 		if err != nil {

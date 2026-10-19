@@ -13,6 +13,7 @@ type Company struct {
 	TaxPercentage           float64 `json:"tax_percentage"`
 	EnableServiceCharge     bool    `json:"enable_service_charge"`
 	ServiceChargePercentage float64 `json:"service_charge_percentage"`
+	AllowCashierStockOpname bool    `json:"allow_cashier_stock_opname"`
 	// Additional fields like Printer IP can be added here if needed,
 	// but are usually device-specific and saved locally.
 }

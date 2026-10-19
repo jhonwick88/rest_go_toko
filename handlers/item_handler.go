@@ -17,9 +17,23 @@ import (
 func GetItems(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		limit, offset := GetPaginationParams(c)
+		barcodeStatus := c.Query("barcode_status")
 
-		query := "SELECT ITEMNO, ITEMUPC, ITEMNAME, ITEMNAME_SHORT, CATEGORYID, ATTRIBUTE, UNIT1, UNIT2, UNIT3, RATIO2, RATIO3, DEF_UNITPRICE1, DEF_UNITPRICE2, DEF_UNITPRICE3, OBQUANTITY, NOTES FROM ITEM ORDER BY ITEMNO ASC LIMIT ? OFFSET ?"
-		rows, err := db.Query(query, limit, offset)
+		baseQuery := "SELECT ITEMNO, ITEMUPC, ITEMNAME, ITEMNAME_SHORT, CATEGORYID, ATTRIBUTE, UNIT1, UNIT2, UNIT3, RATIO2, RATIO3, DEF_UNITPRICE1, DEF_UNITPRICE2, DEF_UNITPRICE3, OBQUANTITY, NOTES FROM ITEM "
+		var rows *sql.Rows
+		var err error
+
+		if barcodeStatus == "has_barcode" {
+			query := baseQuery + "WHERE TRIM(COALESCE(ITEMUPC, '')) != '' ORDER BY ITEMNO ASC LIMIT ? OFFSET ?"
+			rows, err = db.Query(query, limit, offset)
+		} else if barcodeStatus == "no_barcode" {
+			query := baseQuery + "WHERE TRIM(COALESCE(ITEMUPC, '')) = '' ORDER BY ITEMNO ASC LIMIT ? OFFSET ?"
+			rows, err = db.Query(query, limit, offset)
+		} else {
+			query := baseQuery + "ORDER BY ITEMNO ASC LIMIT ? OFFSET ?"
+			rows, err = db.Query(query, limit, offset)
+		}
+
 		if err != nil {
 			log.Printf("[Error] Query GetItems failed: %v", err)
 			SendError(c, http.StatusInternalServerError, "Gagal mengakses database untuk mengambil produk: "+err.Error())
@@ -160,10 +174,17 @@ func SearchItems(db *sql.DB) gin.HandlerFunc {
 		}
 
 		limit, offset := GetPaginationParams(c)
+		barcodeStatus := c.Query("barcode_status")
 
-		// Perform case-insensitive LIKE query using LOWER on name, no, and upc.
-		// Firebird parameter placeholder is ?
-		query := "SELECT ITEMNO, ITEMUPC, ITEMNAME, ITEMNAME_SHORT, CATEGORYID, ATTRIBUTE, UNIT1, UNIT2, UNIT3, RATIO2, RATIO3, DEF_UNITPRICE1, DEF_UNITPRICE2, DEF_UNITPRICE3, OBQUANTITY, NOTES FROM ITEM WHERE LOWER(ITEMNAME) LIKE ? OR LOWER(ITEMNO) LIKE ? OR LOWER(ITEMUPC) LIKE ? ORDER BY ITEMNAME ASC LIMIT ? OFFSET ?"
+		baseQuery := "SELECT ITEMNO, ITEMUPC, ITEMNAME, ITEMNAME_SHORT, CATEGORYID, ATTRIBUTE, UNIT1, UNIT2, UNIT3, RATIO2, RATIO3, DEF_UNITPRICE1, DEF_UNITPRICE2, DEF_UNITPRICE3, OBQUANTITY, NOTES FROM ITEM "
+		whereClause := "(LOWER(ITEMNAME) LIKE ? OR LOWER(ITEMNO) LIKE ? OR LOWER(ITEMUPC) LIKE ?)"
+		if barcodeStatus == "has_barcode" {
+			whereClause += " AND TRIM(COALESCE(ITEMUPC, '')) != ''"
+		} else if barcodeStatus == "no_barcode" {
+			whereClause += " AND TRIM(COALESCE(ITEMUPC, '')) = ''"
+		}
+
+		query := baseQuery + "WHERE " + whereClause + " ORDER BY ITEMNAME ASC LIMIT ? OFFSET ?"
 		searchPattern := "%" + strings.ToLower(queryParam) + "%"
 
 		rows, err := db.Query(query, searchPattern, searchPattern, searchPattern, limit, offset)
@@ -661,6 +682,68 @@ func GetItemsByBarcode(db *sql.DB) gin.HandlerFunc {
 		}
 		
 		SendSuccess(c, "Data ditemukan", items)
+	}
+}
+
+// GetBarcodeStats returns total products, count with barcodes, and count without barcodes.
+func GetBarcodeStats(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var total, withBarcode, withoutBarcode int
+		query := `SELECT 
+			COUNT(*), 
+			COALESCE(SUM(CASE WHEN TRIM(COALESCE(ITEMUPC, '')) != '' THEN 1 ELSE 0 END), 0), 
+			COALESCE(SUM(CASE WHEN TRIM(COALESCE(ITEMUPC, '')) = '' THEN 1 ELSE 0 END), 0) 
+		FROM ITEM`
+		err := db.QueryRow(query).Scan(&total, &withBarcode, &withoutBarcode)
+		if err != nil {
+			log.Printf("[Error] Query GetBarcodeStats failed: %v", err)
+			SendError(c, http.StatusInternalServerError, "Gagal menghitung statistik barcode")
+			return
+		}
+
+		SendSuccess(c, "Statistik barcode berhasil diambil", gin.H{
+			"total":           total,
+			"with_barcode":    withBarcode,
+			"without_barcode": withoutBarcode,
+		})
+	}
+}
+
+// UpdateItemBarcode updates only the ITEMUPC for a specific item.
+func UpdateItemBarcode(db *sql.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		itemNoParam := c.Param("itemno")
+		if itemNoParam == "" {
+			SendError(c, http.StatusBadRequest, "Parameter itemno wajib diisi")
+			return
+		}
+
+		var input struct {
+			Barcode string `json:"barcode"`
+		}
+		if err := c.ShouldBindJSON(&input); err != nil {
+			SendError(c, http.StatusBadRequest, "Payload request tidak valid")
+			return
+		}
+
+		trimmed := strings.TrimSpace(input.Barcode)
+		if trimmed != "" {
+			var existingNo string
+			err := db.QueryRow("SELECT ITEMNO FROM ITEM WHERE ITEMUPC = ? AND ITEMNO != ?", trimmed, itemNoParam).Scan(&existingNo)
+			if err == nil {
+				SendError(c, http.StatusBadRequest, "Barcode sudah digunakan oleh produk lain ("+existingNo+")")
+				return
+			}
+		}
+
+		_, err := db.Exec("UPDATE ITEM SET ITEMUPC = ? WHERE ITEMNO = ?", trimmed, itemNoParam)
+		if err != nil {
+			log.Printf("[Error] UpdateItemBarcode failed: %v", err)
+			SendError(c, http.StatusInternalServerError, "Gagal memperbarui barcode: "+err.Error())
+			return
+		}
+
+		SendSuccess(c, "Barcode berhasil diperbarui", gin.H{"itemno": itemNoParam, "barcode": trimmed})
 	}
 }
 
