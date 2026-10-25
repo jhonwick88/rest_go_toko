@@ -278,6 +278,8 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 			Ratio3        float64 `json:"ratio3"`
 			DefUnitPrice2 float64 `json:"def_unitprice2"`
 			DefUnitPrice3 float64 `json:"def_unitprice3"`
+			UserID        string  `json:"user_id"`
+			Username      string  `json:"username"`
 		}
 
 		var input UpdateItemInput
@@ -303,8 +305,9 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 
 		// First, check if the original item exists in the database
 		var exists int
-		checkQuery := "SELECT 1 FROM ITEM WHERE ITEMNO = ? LIMIT 1"
-		err := db.QueryRow(checkQuery, itemNoParam).Scan(&exists)
+		var oldItemUPC string
+		checkQuery := "SELECT 1, COALESCE(ITEMUPC, '') FROM ITEM WHERE ITEMNO = ? LIMIT 1"
+		err := db.QueryRow(checkQuery, itemNoParam).Scan(&exists, &oldItemUPC)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				SendError(c, http.StatusNotFound, "Produk yang ingin diubah tidak ditemukan")
@@ -329,6 +332,19 @@ func UpdateItem(db *sql.DB) gin.HandlerFunc {
 			log.Printf("[Error] Query UpdateItem failed: %v", err)
 			SendError(c, http.StatusInternalServerError, "Gagal memperbarui database produk: "+err.Error())
 			return
+		}
+
+		// Record barcode log if barcode was recorded or updated
+		if newItemUPC != "" && newItemUPC != oldItemUPC {
+			username := strings.TrimSpace(input.Username)
+			if username == "" {
+				username = "Admin"
+			}
+			userID := strings.TrimSpace(input.UserID)
+			if userID == "" {
+				userID = "admin"
+			}
+			_ = RecordBarcodeLog(db, newItemNo, newItemName, newItemUPC, oldItemUPC, userID, username)
 		}
 
 		// Retrieve updated item details to send back
@@ -424,6 +440,8 @@ func CreateItem(db *sql.DB) gin.HandlerFunc {
 			Ratio3        float64  `json:"ratio3"`
 			DefUnitPrice2 float64  `json:"def_unitprice2"`
 			DefUnitPrice3 float64  `json:"def_unitprice3"`
+			UserID        string   `json:"user_id"`
+			Username      string   `json:"username"`
 		}
 
 		var input CreateItemInput
@@ -479,6 +497,18 @@ func CreateItem(db *sql.DB) gin.HandlerFunc {
 			log.Printf("[Error] Query CreateItem failed: %v", err)
 			SendError(c, http.StatusInternalServerError, "Gagal menambahkan produk baru ke database: "+err.Error())
 			return
+		}
+
+		if itemUPC != "" {
+			username := strings.TrimSpace(input.Username)
+			if username == "" {
+				username = "Admin"
+			}
+			userID := strings.TrimSpace(input.UserID)
+			if userID == "" {
+				userID = "admin"
+			}
+			_ = RecordBarcodeLog(db, itemNo, itemName, itemUPC, "", userID, username)
 		}
 
 		// Retrieve created item details to send back
@@ -719,7 +749,9 @@ func UpdateItemBarcode(db *sql.DB) gin.HandlerFunc {
 		}
 
 		var input struct {
-			Barcode string `json:"barcode"`
+			Barcode  string `json:"barcode"`
+			UserID   string `json:"user_id"`
+			Username string `json:"username"`
 		}
 		if err := c.ShouldBindJSON(&input); err != nil {
 			SendError(c, http.StatusBadRequest, "Payload request tidak valid")
@@ -736,11 +768,31 @@ func UpdateItemBarcode(db *sql.DB) gin.HandlerFunc {
 			}
 		}
 
+		// Retrieve current item name and old barcode
+		var itemName, oldUPC string
+		_ = db.QueryRow("SELECT COALESCE(ITEMNAME, ''), COALESCE(ITEMUPC, '') FROM ITEM WHERE ITEMNO = ?", itemNoParam).Scan(&itemName, &oldUPC)
+		if itemName == "" {
+			itemName = itemNoParam
+		}
+
 		_, err := db.Exec("UPDATE ITEM SET ITEMUPC = ? WHERE ITEMNO = ?", trimmed, itemNoParam)
 		if err != nil {
 			log.Printf("[Error] UpdateItemBarcode failed: %v", err)
 			SendError(c, http.StatusInternalServerError, "Gagal memperbarui barcode: "+err.Error())
 			return
+		}
+
+		// Record Barcode Log if barcode is non-empty and changed
+		if trimmed != "" && trimmed != oldUPC {
+			username := strings.TrimSpace(input.Username)
+			if username == "" {
+				username = "Admin"
+			}
+			userID := strings.TrimSpace(input.UserID)
+			if userID == "" {
+				userID = "admin"
+			}
+			_ = RecordBarcodeLog(db, itemNoParam, itemName, trimmed, oldUPC, userID, username)
 		}
 
 		SendSuccess(c, "Barcode berhasil diperbarui", gin.H{"itemno": itemNoParam, "barcode": trimmed})

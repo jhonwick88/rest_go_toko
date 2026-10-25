@@ -55,6 +55,12 @@ func SetupRouter(db *sql.DB) *gin.Engine {
 		// Quick Item routes
 		api.GET("/quick-items", handlers.GetQuickItems(db))
 		api.POST("/quick-items", handlers.CreateQuickItem(db))
+		api.PUT("/quick-items/:id", handlers.UpdateQuickItem(db))
+		api.DELETE("/quick-items/:id", handlers.DeleteQuickItem(db))
+		api.POST("/quick-items/batch", handlers.SaveQuickItemsBatch(db))
+
+		// Barcode Logs routes
+		api.GET("/barcode-logs", handlers.GetBarcodeLogs(db))
 
 		// Sales routes
 		api.GET("/sales", handlers.GetSales(db))

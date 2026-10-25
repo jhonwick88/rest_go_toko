@@ -31,9 +31,21 @@ func GetSales(db *sql.DB) gin.HandlerFunc {
 		var args []interface{}
 
 		var conditions []string
-		if startDate != "" && endDate != "" {
-			conditions = append(conditions, "DATE >= ? AND DATE <= ?")
-			args = append(args, startDate, endDate)
+		if startDate != "" {
+			startDay := startDate
+			if len(startDay) >= 10 {
+				startDay = startDay[:10]
+			}
+			conditions = append(conditions, "substr(DATE, 1, 10) >= ?")
+			args = append(args, startDay)
+		}
+		if endDate != "" {
+			endDay := endDate
+			if len(endDay) >= 10 {
+				endDay = endDay[:10]
+			}
+			conditions = append(conditions, "substr(DATE, 1, 10) <= ?")
+			args = append(args, endDay)
 		}
 		if searchQuery != "" {
 			conditions = append(conditions, "(INVOICE_NO LIKE ? OR CASHIER LIKE ? OR INVOICE_NO IN (SELECT DISTINCT INVOICE_NO FROM SALES_ITEMS WHERE ITEMNAME LIKE ? OR ITEMNO LIKE ? OR ITEMUPC LIKE ?))")

@@ -54,6 +54,16 @@ func InitDB(cfg *config.Config) (*sql.DB, error) {
 		ACCURACY_RATE REAL,
 		NOTES TEXT
 	);
+	CREATE TABLE IF NOT EXISTS BARCODE_LOGS (
+		ID TEXT PRIMARY KEY,
+		ITEM_NO TEXT NOT NULL,
+		ITEM_NAME TEXT NOT NULL,
+		BARCODE TEXT NOT NULL,
+		PREVIOUS_BARCODE TEXT,
+		USER_ID TEXT,
+		USERNAME TEXT NOT NULL,
+		RECORDED_AT TEXT NOT NULL
+	);
 	`
 	if _, err := db.Exec(migrationQuery); err != nil {
 		log.Printf("[Warning] Failed to run table migrations: %v", err)
@@ -89,6 +99,9 @@ func InitDB(cfg *config.Config) (*sql.DB, error) {
 	CREATE INDEX IF NOT EXISTS idx_stock_ledger_itemno ON STOCK_LEDGER(ITEMNO);
 	CREATE INDEX IF NOT EXISTS idx_cash_movements_date ON CASH_MOVEMENTS(DATE);
 	CREATE INDEX IF NOT EXISTS idx_cash_reconciliations_date ON CASH_RECONCILIATIONS(DATE);
+	CREATE INDEX IF NOT EXISTS idx_barcode_logs_date ON BARCODE_LOGS(RECORDED_AT);
+	CREATE INDEX IF NOT EXISTS idx_barcode_logs_user ON BARCODE_LOGS(USERNAME);
+	CREATE INDEX IF NOT EXISTS idx_barcode_logs_item ON BARCODE_LOGS(ITEM_NO);
 	`
 	if _, err := db.Exec(indexQueries); err != nil {
 		log.Printf("[Warning] Failed to create database indexes: %v", err)

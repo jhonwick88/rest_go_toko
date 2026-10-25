@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"rest_go_toko/models"
@@ -18,20 +20,34 @@ func GetCashMovements(db *sql.DB) gin.HandlerFunc {
 		startDate := c.Query("start_date")
 		endDate := c.Query("end_date")
 
-		var query string
+		var conditions []string
 		var args []interface{}
 
-		if startDate != "" && endDate != "" {
-			query = "SELECT ID, DATE, CASHIER_NAME, TYPE, CATEGORY, AMOUNT, NOTES FROM CASH_MOVEMENTS WHERE DATE >= ? AND DATE <= ? ORDER BY DATE DESC"
-			args = append(args, startDate, endDate)
-		} else if startDate != "" {
-			query = "SELECT ID, DATE, CASHIER_NAME, TYPE, CATEGORY, AMOUNT, NOTES FROM CASH_MOVEMENTS WHERE DATE >= ? ORDER BY DATE DESC"
-			args = append(args, startDate)
-		} else {
-			limit, offset := GetPaginationParams(c)
-			query = "SELECT ID, DATE, CASHIER_NAME, TYPE, CATEGORY, AMOUNT, NOTES FROM CASH_MOVEMENTS ORDER BY DATE DESC LIMIT ? OFFSET ?"
-			args = append(args, limit, offset)
+		if startDate != "" {
+			startDay := startDate
+			if len(startDay) >= 10 {
+				startDay = startDay[:10]
+			}
+			conditions = append(conditions, "substr(DATE, 1, 10) >= ?")
+			args = append(args, startDay)
 		}
+		if endDate != "" {
+			endDay := endDate
+			if len(endDay) >= 10 {
+				endDay = endDay[:10]
+			}
+			conditions = append(conditions, "substr(DATE, 1, 10) <= ?")
+			args = append(args, endDay)
+		}
+
+		whereClause := ""
+		if len(conditions) > 0 {
+			whereClause = "WHERE " + strings.Join(conditions, " AND ") + " "
+		}
+
+		limit, offset := GetPaginationParams(c)
+		query := fmt.Sprintf("SELECT ID, DATE, CASHIER_NAME, TYPE, CATEGORY, AMOUNT, NOTES FROM CASH_MOVEMENTS %sORDER BY DATE DESC LIMIT ? OFFSET ?", whereClause)
+		args = append(args, limit, offset)
 
 		rows, err := db.Query(query, args...)
 		if err != nil {
