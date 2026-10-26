@@ -1,0 +1,51 @@
+=======================================================================
+    PANDUAN PENGELOLAAN SERVICE TOKOPINTAR POS (restToko)
+                     Untuk Windows 10 & 11
+=======================================================================
+
+File script ini digunakan untuk mengontrol service backend TokoPintar
+(restToko) tanpa perlu membuka jendela services.msc secara manual.
+
+-----------------------------------------------------------------------
+DAFTAR FILE:
+-----------------------------------------------------------------------
+1. kelola_service.bat   -> Menu lengkap serbaguna (Nyalakan, Matikan, 
+                           Restart, dan Cek Status).
+2. nyalakan_service.bat -> Script cepat untuk menyalakan service.
+3. matikan_service.bat  -> Script cepat untuk mematikan service.
+4. restart_service.bat  -> Script cepat untuk mulai ulang service.
+
+-----------------------------------------------------------------------
+CARA PENGGUNAAN (UNTUK PELANGGAN):
+-----------------------------------------------------------------------
+
+CARA 1: Melalui Menu Interaktif (Sangat Direkomendasikan)
+1. Klik kanan pada file 'kelola_service.bat', lalu pilih:
+   "Run as administrator" (atau "Jalankan sebagai administrator").
+2. Jika muncul pop-up izin Windows (UAC), pilih "Yes".
+3. Anda akan melihat status service saat ini (Aktif atau Mati).
+4. Ketik angka menu yang diinginkan:
+   - Ketik 1 lalu tekan Enter untuk Menyalakan Service.
+   - Ketik 2 lalu tekan Enter untuk Mematikan Service.
+   - Ketik 3 lalu tekan Enter untuk Restart Service.
+   - Ketik 4 lalu tekan Enter untuk Melihat detail status.
+   - Ketik 0 lalu tekan Enter untuk Keluar.
+
+CARA 2: Melalui Script Cepat (1-Klik)
+- Jika ingin mematikan service:
+  Klik kanan 'matikan_service.bat' -> Pilih "Run as administrator".
+- Jika ingin menyalakan kembali service:
+  Klik kanan 'nyalakan_service.bat' -> Pilih "Run as administrator".
+- Jika ingin merestart service:
+  Klik kanan 'restart_service.bat' -> Pilih "Run as administrator".
+
+-----------------------------------------------------------------------
+CATATAN PENTING:
+-----------------------------------------------------------------------
+- Script ini membutuhkan izin Administrator karena berinteraksi langsung 
+  dengan Service Windows (services.msc).
+- Jika Anda lupa klik kanan 'Run as administrator', script akan secara 
+  otomatis mencoba meminta izin administrator (pop-up Yes/No).
+- Nama service terdaftar di Windows: restToko
+- File eksekusi backend: restToko.exe
+=======================================================================

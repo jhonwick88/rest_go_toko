@@ -1,0 +1,48 @@
+=======================================================================
+     PANDUAN PENGELOLAAN SERVICE BELL PINTAR (bellServer)
+                     Untuk Windows 10 & 11
+=======================================================================
+
+File script ini digunakan untuk mengontrol service backend Bell Pintar
+(bellServer) di Windows tanpa perlu membuka jendela services.msc.
+
+-----------------------------------------------------------------------
+DAFTAR FILE:
+-----------------------------------------------------------------------
+1. kelola_service_bellServer.bat   -> Menu lengkap (Nyalakan, Matikan, 
+                                      Restart, dan Cek Status).
+2. nyalakan_service_bellServer.bat -> Tombol cepat menyalakan service.
+3. matikan_service_bellServer.bat  -> Tombol cepat mematikan service.
+4. restart_service_bellServer.bat  -> Tombol cepat restart service.
+
+-----------------------------------------------------------------------
+CARA PENGGUNAAN (UNTUK PELANGGAN):
+-----------------------------------------------------------------------
+
+METODE 1: Menggunakan Menu Lengkap (Disarankan)
+1. Klik kanan pada file 'kelola_service_bellServer.bat'.
+2. Pilih "Run as administrator" (Jalankan sebagai administrator).
+3. Jika muncul pop-up izin Windows (UAC), pilih "Yes".
+4. Pilih angka sesuai kebutuhan:
+   - Ketik 1 lalu tekan Enter -> Menyalakan Service.
+   - Ketik 2 lalu tekan Enter -> Mematikan Service.
+   - Ketik 3 lalu tekan Enter -> Restart Service.
+   - Ketik 4 lalu tekan Enter -> Cek Status Service.
+   - Ketik 0 lalu tekan Enter -> Keluar.
+
+METODE 2: Tombol Cepat (1-Klik)
+- Mematikan Service : Klik kanan 'matikan_service_bellServer.bat'  -> Run as administrator.
+- Menyalakan Service: Klik kanan 'nyalakan_service_bellServer.bat' -> Run as administrator.
+- Restart Service   : Klik kanan 'restart_service_bellServer.bat'  -> Run as administrator.
+
+-----------------------------------------------------------------------
+TIPS MEMBUAT SHORTCUT DI DESKTOP:
+-----------------------------------------------------------------------
+1. Klik kanan pada 'kelola_service_bellServer.bat'.
+2. Pilih 'Send to' -> 'Desktop (create shortcut)'.
+3. Klik kanan shortcut di Desktop -> Pilih 'Properties'.
+4. Di tab Shortcut, klik tombol 'Advanced...'.
+5. Centang 'Run as administrator' -> Klik 'OK' lalu 'Apply'.
+6. Ganti nama shortcut menjadi "Kelola Service Bell Pintar".
+   (Setelah ini pelanggan cukup klik 2x dari Desktop tanpa perlu klik kanan lagi)
+=======================================================================
